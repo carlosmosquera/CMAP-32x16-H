@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro; // Ensure you have this for TextMeshPro
+using TMPro;
 using extOSC;
 using System.Collections.Generic;
 using System.IO;
@@ -8,60 +8,56 @@ using System.Collections;
 
 public class FileManager : MonoBehaviour
 {
-    public GameObject content; // Drag and drop the Content parent object here
+    public GameObject content;
     public Button saveButton;
     public Button loadButton;
-    public Button deleteButton; // Button to delete selected file
-    public InputField fileNameInput; // For saving a new file
-    public Dropdown fileDropdown; // Dropdown for loading files
+    public Button deleteButton;
+    public InputField fileNameInput;
+    public Dropdown fileDropdown;
     public OSCTransmitter Transmitter;
 
-    private List<Vector3> savedPositions = new List<Vector3>(); // To store the positions of the child objects
-    private List<string> savedTexts = new List<string>(); // To store the text from InputFields
+    public CustomZoneSpawner customZoneSpawner; // Reference to CustomZoneSpawner
+
+    private List<Vector3> savedPositions = new List<Vector3>();
+    private List<string> savedTexts = new List<string>();
+    private List<float> savedAngles = new List<float>(); // To store degree angles
+    private string customZoneInputValue = ""; // To store CustomZoneSpawner input field value
     private Transform[] objTransforms;
     private Transform[] textTransforms;
 
     void Start()
     {
-        // Initialize child transforms array for positions
         objTransforms = new Transform[transform.childCount];
         for (int i = 0; i < transform.childCount; i++)
         {
             objTransforms[i] = transform.GetChild(i);
         }
 
-        // Initialize child transforms array for text fields
         textTransforms = new Transform[content.transform.childCount];
         for (int i = 0; i < content.transform.childCount; i++)
         {
             textTransforms[i] = content.transform.GetChild(i);
         }
 
-        // Assign button click events
         saveButton.onClick.AddListener(SaveData);
         loadButton.onClick.AddListener(LoadSelectedData);
         deleteButton.onClick.AddListener(DeleteSelectedFile);
 
-        // Populate the dropdown with saved files on start
         UpdateFileDropdown();
 
-        // Optional: Set the input field to the first dropdown option if available
         if (fileDropdown.options.Count > 0)
         {
             fileNameInput.text = fileDropdown.options[0].text;
         }
 
-        // Update input field when dropdown selection changes
         fileDropdown.onValueChanged.AddListener(OnDropdownValueChanged);
     }
 
-    // Update input field when the dropdown value changes
     private void OnDropdownValueChanged(int index)
     {
         fileNameInput.text = fileDropdown.options[index].text;
     }
 
-    // Save both the positions and the texts of all child objects with a specified file name
     void SaveData()
     {
         string fileName = fileNameInput.text.Trim();
@@ -71,17 +67,15 @@ public class FileManager : MonoBehaviour
             return;
         }
 
-        // Clear previous saved data
         savedPositions.Clear();
         savedTexts.Clear();
+        savedAngles.Clear();
 
-        // Save positions
         foreach (Transform child in objTransforms)
         {
             savedPositions.Add(child.position);
         }
 
-        // Save texts
         foreach (Transform child in textTransforms)
         {
             TMP_InputField inputField = child.GetComponentInChildren<TMP_InputField>();
@@ -91,18 +85,19 @@ public class FileManager : MonoBehaviour
             }
             else
             {
-                savedTexts.Add(""); // In case there's no TMP_InputField, store an empty string
+                savedTexts.Add("");
             }
         }
 
+        // Save data from CustomZoneSpawner
+        savedAngles.AddRange(customZoneSpawner.degreeAngles);
+        customZoneInputValue = customZoneSpawner.inputField != null ? customZoneSpawner.inputField.text : "";
+
         SaveDataToFile(fileName);
         Debug.Log($"Data saved to {fileName}");
-
-        // Update the dropdown after saving to reflect changes, but keep the current selection
         UpdateFileDropdown(fileName);
     }
 
-    // Load the selected file from the dropdown
     void LoadSelectedData()
     {
         int selectedIndex = fileDropdown.value;
@@ -112,7 +107,6 @@ public class FileManager : MonoBehaviour
         ApplyLoadedData();
     }
 
-    // Delete the selected file from the dropdown
     void DeleteSelectedFile()
     {
         int selectedIndex = fileDropdown.value;
@@ -123,7 +117,7 @@ public class FileManager : MonoBehaviour
         {
             File.Delete(filePath);
             Debug.Log($"File {fileName} deleted.");
-            UpdateFileDropdown(); // Refresh the dropdown after deletion
+            UpdateFileDropdown();
         }
         else
         {
@@ -136,7 +130,6 @@ public class FileManager : MonoBehaviour
         fileDropdown.ClearOptions();
         List<string> fileNames = new List<string>();
 
-        // Load all JSON files from the persistent data path
         string[] files = Directory.GetFiles(Application.persistentDataPath, "*.json");
         foreach (string file in files)
         {
@@ -146,7 +139,6 @@ public class FileManager : MonoBehaviour
 
         fileDropdown.AddOptions(fileNames);
 
-        // Reset input field if there are options available
         if (fileNames.Count > 0)
         {
             if (!string.IsNullOrEmpty(selectedFileName) && fileNames.Contains(selectedFileName))
@@ -162,11 +154,10 @@ public class FileManager : MonoBehaviour
         }
         else
         {
-            fileNameInput.text = ""; // Clear input field if no files exist
+            fileNameInput.text = "";
         }
     }
 
-    // Apply the loaded positions and texts to the child objects
     private void ApplyLoadedData()
     {
         if (savedPositions.Count != objTransforms.Length || savedTexts.Count != textTransforms.Length)
@@ -175,13 +166,11 @@ public class FileManager : MonoBehaviour
             return;
         }
 
-        // Apply positions
         for (int i = 0; i < objTransforms.Length; i++)
         {
             objTransforms[i].position = savedPositions[i];
         }
 
-        // Apply texts
         for (int i = 0; i < textTransforms.Length; i++)
         {
             TMP_InputField inputField = textTransforms[i].GetComponentInChildren<TMP_InputField>();
@@ -190,17 +179,23 @@ public class FileManager : MonoBehaviour
                 inputField.text = savedTexts[i];
             }
         }
-        StartCoroutine(SendPositionsViaOSC());
 
+        // Apply data to CustomZoneSpawner
+        customZoneSpawner.degreeAngles = new List<float>(savedAngles);
+        if (customZoneSpawner.inputField != null)
+        {
+            customZoneSpawner.inputField.text = customZoneInputValue;
+        }
+        customZoneSpawner.SpawnObjects();
+
+        StartCoroutine(SendPositionsViaOSC());
         Debug.Log("Data loaded and applied");
     }
-
 
     private IEnumerator SendPositionsViaOSC()
     {
         for (int i = 0; i < savedPositions.Count; i++)
         {
-            // Calculate the polar float and send OSC
             float outPolarFloat = Mathf.Atan2(savedPositions[i].y, savedPositions[i].x) * Mathf.Rad2Deg;
             int outPolar = Mathf.RoundToInt((450 - outPolarFloat) % 360);
             int objectNumber = i + 1;
@@ -210,27 +205,24 @@ public class FileManager : MonoBehaviour
             message.AddValue(OSCValue.Int(outPolar));
 
             Transmitter.Send(message);
-            //Debug.Log($"Object {objectNumber} position: {outPolar} degrees");
-
-            // Optionally add a small delay between sends if needed
-            yield return new WaitForSeconds(0.1f); // Adjust this delay as needed
+            yield return new WaitForSeconds(0.1f);
         }
     }
 
-    // Save both positions and texts to a single file with the specified file name
     void SaveDataToFile(string fileName)
     {
         string filePath = Path.Combine(Application.persistentDataPath, $"{fileName}.json");
         Data data = new Data
         {
             positions = savedPositions.ToArray(),
-            texts = savedTexts.ToArray()
+            texts = savedTexts.ToArray(),
+            degreeAngles = savedAngles.ToArray(),
+            customZoneInputValue = customZoneInputValue
         };
         string jsonData = JsonUtility.ToJson(data);
         File.WriteAllText(filePath, jsonData);
     }
 
-    // Load both positions and texts from a specified file
     void LoadDataFromFile(string fileName)
     {
         string filePath = Path.Combine(Application.persistentDataPath, $"{fileName}.json");
@@ -239,25 +231,10 @@ public class FileManager : MonoBehaviour
             string jsonData = File.ReadAllText(filePath);
             Data data = JsonUtility.FromJson<Data>(jsonData);
 
-            // Check if the texts array is null, and handle it
-            if (data.texts != null)
-            {
-                savedTexts = new List<string>(data.texts);
-            }
-            else
-            {
-                savedTexts = new List<string>(); // Initialize as an empty list if it's null
-            }
-
-            // Check if the positions array is null, and handle it
-            if (data.positions != null)
-            {
-                savedPositions = new List<Vector3>(data.positions);
-            }
-            else
-            {
-                savedPositions = new List<Vector3>(); // Initialize as an empty list if it's null
-            }
+            savedTexts = new List<string>(data.texts);
+            savedPositions = new List<Vector3>(data.positions);
+            savedAngles = new List<float>(data.degreeAngles);
+            customZoneInputValue = data.customZoneInputValue;
 
             Debug.Log($"Data loaded from {fileName}");
         }
@@ -267,12 +244,12 @@ public class FileManager : MonoBehaviour
         }
     }
 
-
-    // Data structure to hold positions and texts for saving/loading
     [System.Serializable]
     public class Data
     {
         public Vector3[] positions;
         public string[] texts;
+        public float[] degreeAngles;
+        public string customZoneInputValue;
     }
 }

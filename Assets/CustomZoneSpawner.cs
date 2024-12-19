@@ -115,7 +115,7 @@ void SpawnObjectAtAngle(float angle)
     spawnedObjects.Add(spawnedObject);
 }
 
-void SpawnObjects()
+public void SpawnObjects()
 {
     // Clear previously spawned objects
     foreach (GameObject obj in spawnedObjects)

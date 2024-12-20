@@ -5,6 +5,7 @@ using extOSC;
 using System.Collections.Generic;
 using System.IO;
 using System.Collections;
+using System;
 
 public class FileManager : MonoBehaviour
 {
@@ -17,13 +18,16 @@ public class FileManager : MonoBehaviour
     public OSCTransmitter Transmitter;
 
     public CustomZoneSpawner customZoneSpawner; // Reference to CustomZoneSpawner
+    public Toggle toggle; // Reference to the Toggle UI element
 
     private List<Vector3> savedPositions = new List<Vector3>();
     private List<string> savedTexts = new List<string>();
     private List<float> savedAngles = new List<float>(); // To store degree angles
     private string customZoneInputValue = ""; // To store CustomZoneSpawner input field value
+    private bool toggleState; // To save the state of the Toggle UI element
     private Transform[] objTransforms;
     private Transform[] textTransforms;
+    public Button externalButton; // Reference to the external button
 
     void Start()
     {
@@ -93,6 +97,9 @@ public class FileManager : MonoBehaviour
         savedAngles.AddRange(customZoneSpawner.degreeAngles);
         customZoneInputValue = customZoneSpawner.inputField != null ? customZoneSpawner.inputField.text : "";
 
+        // Save the Toggle state
+        toggleState = toggle != null && toggle.isOn;
+
         SaveDataToFile(fileName);
         Debug.Log($"Data saved to {fileName}");
         UpdateFileDropdown(fileName);
@@ -158,39 +165,61 @@ public class FileManager : MonoBehaviour
         }
     }
 
-    private void ApplyLoadedData()
+private void ApplyLoadedData()
+{
+    if (savedPositions.Count != objTransforms.Length || savedTexts.Count != textTransforms.Length)
     {
-        if (savedPositions.Count != objTransforms.Length || savedTexts.Count != textTransforms.Length)
-        {
-            Debug.LogWarning("No saved data or number of children has changed");
-            return;
-        }
-
-        for (int i = 0; i < objTransforms.Length; i++)
-        {
-            objTransforms[i].position = savedPositions[i];
-        }
-
-        for (int i = 0; i < textTransforms.Length; i++)
-        {
-            TMP_InputField inputField = textTransforms[i].GetComponentInChildren<TMP_InputField>();
-            if (inputField != null)
-            {
-                inputField.text = savedTexts[i];
-            }
-        }
-
-        // Apply data to CustomZoneSpawner
-        customZoneSpawner.degreeAngles = new List<float>(savedAngles);
-        if (customZoneSpawner.inputField != null)
-        {
-            customZoneSpawner.inputField.text = customZoneInputValue;
-        }
-        customZoneSpawner.SpawnObjects();
-
-        StartCoroutine(SendPositionsViaOSC());
-        Debug.Log("Data loaded and applied");
+        Debug.LogWarning("No saved data or number of children has changed");
+        return;
     }
+
+    for (int i = 0; i < objTransforms.Length; i++)
+    {
+        objTransforms[i].position = savedPositions[i];
+    }
+
+    for (int i = 0; i < textTransforms.Length; i++)
+    {
+        TMP_InputField inputField = textTransforms[i].GetComponentInChildren<TMP_InputField>();
+        if (inputField != null)
+        {
+            inputField.text = savedTexts[i];
+        }
+    }
+
+    // Apply loaded angles to CustomZoneSpawner
+    customZoneSpawner.degreeAngles = new List<float>(savedAngles); // Assign loaded angles directly
+    Debug.Log($"Applying degree angles: {string.Join(", ", savedAngles)}");
+
+    if (customZoneSpawner.inputField != null)
+    {
+        customZoneSpawner.inputField.text = customZoneInputValue;
+        customZoneSpawner.inputField.onEndEdit.Invoke(customZoneInputValue);
+    }
+
+    // Refresh input fields and objects
+    customZoneSpawner.UpdateAngleInputFields();
+    customZoneSpawner.SpawnObjects();
+
+    // Apply toggle state
+    if (toggle != null)
+    {
+        toggle.isOn = toggleState;
+    }
+
+    Debug.Log("Data loaded and applied");
+
+    // Invoke the external button's onClick
+    if (externalButton != null)
+    {
+        externalButton.onClick.Invoke();
+        Debug.Log("External button was pressed programmatically.");
+    }
+    else
+    {
+        Debug.LogWarning("External button is not assigned.");
+    }
+}
 
     private IEnumerator SendPositionsViaOSC()
     {
@@ -209,47 +238,51 @@ public class FileManager : MonoBehaviour
         }
     }
 
-    void SaveDataToFile(string fileName)
+void SaveDataToFile(string fileName)
+{
+    string filePath = Path.Combine(Application.persistentDataPath, $"{fileName}.json");
+    Data data = new Data
     {
-        string filePath = Path.Combine(Application.persistentDataPath, $"{fileName}.json");
-        Data data = new Data
-        {
-            positions = savedPositions.ToArray(),
-            texts = savedTexts.ToArray(),
-            degreeAngles = savedAngles.ToArray(),
-            customZoneInputValue = customZoneInputValue
-        };
-        string jsonData = JsonUtility.ToJson(data);
-        File.WriteAllText(filePath, jsonData);
-    }
+        positions = savedPositions.ToArray(),
+        texts = savedTexts.ToArray(),
+        degreeAngles = savedAngles.ConvertAll(angle => Mathf.RoundToInt(angle)).ToArray(), // Convert floats to integers
+        customZoneInputValue = customZoneInputValue,
+        toggleState = toggleState
+    };
+    string jsonData = JsonUtility.ToJson(data);
+    File.WriteAllText(filePath, jsonData);
+    Debug.Log($"Data saved to {filePath}");
+}
 
-    void LoadDataFromFile(string fileName)
+void LoadDataFromFile(string fileName)
+{
+    string filePath = Path.Combine(Application.persistentDataPath, $"{fileName}.json");
+    if (File.Exists(filePath))
     {
-        string filePath = Path.Combine(Application.persistentDataPath, $"{fileName}.json");
-        if (File.Exists(filePath))
-        {
-            string jsonData = File.ReadAllText(filePath);
-            Data data = JsonUtility.FromJson<Data>(jsonData);
+        string jsonData = File.ReadAllText(filePath);
+        Data data = JsonUtility.FromJson<Data>(jsonData);
 
-            savedTexts = new List<string>(data.texts);
-            savedPositions = new List<Vector3>(data.positions);
-            savedAngles = new List<float>(data.degreeAngles);
-            customZoneInputValue = data.customZoneInputValue;
+        savedTexts = new List<string>(data.texts);
+        savedPositions = new List<Vector3>(data.positions);
+        savedAngles = new List<float>(Array.ConvertAll(data.degreeAngles, angle => (float)angle)); // Convert integers to floats for internal use
+        customZoneInputValue = data.customZoneInputValue;
+        toggleState = data.toggleState;
 
-            Debug.Log($"Data loaded from {fileName}");
-        }
-        else
-        {
-            Debug.LogWarning($"File {fileName} not found!");
-        }
+        Debug.Log($"Loaded degree angles: {string.Join(", ", data.degreeAngles)}");
     }
+    else
+    {
+        Debug.LogWarning($"File {fileName} not found!");
+    }
+}
 
     [System.Serializable]
     public class Data
     {
         public Vector3[] positions;
         public string[] texts;
-        public float[] degreeAngles;
+        public int[] degreeAngles;
         public string customZoneInputValue;
+        public bool toggleState; // State of the toggle
     }
 }

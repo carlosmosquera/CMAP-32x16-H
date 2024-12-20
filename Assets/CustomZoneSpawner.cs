@@ -35,32 +35,32 @@ public class CustomZoneSpawner : MonoBehaviour
         SpawnObjects();
     }
 
-    void CreateAngleInputFields()
+void CreateAngleInputFields()
+{
+    // Clear existing input fields
+    foreach (InputField field in angleInputFields)
     {
-        // Clear existing input fields
-        foreach (InputField field in angleInputFields)
+        if (field != null)
         {
-            if (field != null)
-            {
-                Destroy(field.gameObject);
-            }
-        }
-        angleInputFields.Clear();
-
-        // Create new input fields based on numberOfObjects
-        for (int i = 0; i < numberOfObjects; i++)
-        {
-            GameObject inputGO = Instantiate(angleInputPrefab, angleInputContainer);
-            InputField angleField = inputGO.GetComponent<InputField>();
-            if (angleField != null)
-            {
-                int index = i; // Capture the current index for the delegate
-                angleField.text = "0"; // Default value
-                angleField.onEndEdit.AddListener(value => UpdateAngleAtIndex(index, value));
-                angleInputFields.Add(angleField);
-            }
+            Destroy(field.gameObject);
         }
     }
+    angleInputFields.Clear();
+
+    // Create new input fields based on degreeAngles
+    for (int i = 0; i < degreeAngles.Count; i++)
+    {
+        GameObject inputGO = Instantiate(angleInputPrefab, angleInputContainer);
+        InputField angleField = inputGO.GetComponent<InputField>();
+        if (angleField != null)
+        {
+            int index = i; // Capture the current index for the delegate
+            angleField.text = degreeAngles[index].ToString(); // Set to current degree angle
+            angleField.onEndEdit.AddListener(value => UpdateAngleAtIndex(index, value));
+            angleInputFields.Add(angleField);
+        }
+    }
+}
 
     void UpdateAngleAtIndex(int index, string value)
     {
@@ -90,14 +90,14 @@ void UpdateDegreeAngles()
 
     for (int i = 0; i < numberOfObjects; i++)
     {
-        // Use default values or user inputs
+        // Use existing input values or default to the calculated step
         if (i < angleInputFields.Count && float.TryParse(angleInputFields[i].text, out float angle))
         {
-            degreeAngles.Add(-angle); // Negate the input to maintain clockwise behavior
+            degreeAngles.Add(angle); // Use the input angle directly
         }
         else
         {
-            degreeAngles.Add(-i * angleStep); // Negate the default to maintain clockwise behavior
+            degreeAngles.Add(i * angleStep); // Default to evenly distributed angles
         }
     }
 }
@@ -167,6 +167,29 @@ public void SpawnObjects()
             }
         }
     }
+
+public void UpdateAngleInputFields()
+{
+    // Ensure the angle input fields match the current degree angles
+    if (angleInputFields.Count != numberOfObjects)
+    {
+        CreateAngleInputFields(); // Recreate the input fields if count mismatches
+    }
+
+    for (int i = 0; i < angleInputFields.Count; i++)
+    {
+        if (i < degreeAngles.Count)
+        {
+            angleInputFields[i].text = Mathf.RoundToInt(degreeAngles[i]).ToString(); // Use loaded angles directly
+        }
+        else
+        {
+            angleInputFields[i].text = "0"; // Default value if no angle exists
+        }
+    }
+
+    Debug.Log($"Updated input fields with angles: {string.Join(", ", degreeAngles)}");
+}
 
     public void SendDegreeAnglesViaOSC()
     {

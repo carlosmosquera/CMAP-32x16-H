@@ -44377,6 +44377,7 @@ MonoBehaviour:
   fileDropdown: {fileID: 8940371415136998785}
   customZoneSpawner: {fileID: 1660191660}
   toggle: {fileID: 87698136}
+  Transmitter: {fileID: 1560372065}
   externalButton: {fileID: 802164364}
 --- !u!1 &1876408673
 GameObject:
@@ -54052,11 +54053,11 @@ RectTransform:
   m_Children:
   - {fileID: 3942706690659122036}
   - {fileID: 7547035988828145186}
+  - {fileID: 6979943997293875193}
   - {fileID: 6598433754426165642}
   - {fileID: 6465724836691045254}
   - {fileID: 6010324276287879262}
   - {fileID: 5003075129395038906}
-  - {fileID: 6979943997293875193}
   m_Father: {fileID: 2137777102}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -54205,7 +54206,7 @@ MonoBehaviour:
   onValueChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_IsOn: 1
+  m_IsOn: 0
 --- !u!224 &4498317354273501525
 RectTransform:
   m_ObjectHideFlags: 0
@@ -55168,7 +55169,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: SKILLS
+  m_Text: MIXER
 --- !u!1 &5934419067532843134
 GameObject:
   m_ObjectHideFlags: 0
@@ -56093,10 +56094,10 @@ RectTransform:
   - {fileID: 8974987729524759698}
   m_Father: {fileID: 4238742666085414771}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 1910.4418, y: -98.5}
-  m_SizeDelta: {x: 112.308655, y: 127}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &7562569840118942975
 CanvasRenderer:
@@ -56271,10 +56272,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 7547035988828145186}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 56.154327, y: -63.5}
-  m_SizeDelta: {x: 112.308655, y: 127}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!224 &7873530263239994235
 RectTransform:
@@ -56507,12 +56508,12 @@ GameObject:
   - component: {fileID: 4475164010578263506}
   - component: {fileID: 5214746571410723125}
   m_Layer: 5
-  m_Name: Toggle (5)
+  m_Name: MIXER
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!222 &8300895813054668319
 CanvasRenderer:
   m_ObjectHideFlags: 0

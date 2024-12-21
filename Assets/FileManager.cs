@@ -28,38 +28,61 @@ public class FileManager : MonoBehaviour
     private Transform[] textTransforms;
     public Button externalButton; // Reference to the external button
 
-    void Start()
+void Start()
+{
+    objTransforms = new Transform[transform.childCount];
+    for (int i = 0; i < transform.childCount; i++)
     {
-        objTransforms = new Transform[transform.childCount];
-        for (int i = 0; i < transform.childCount; i++)
-        {
-            objTransforms[i] = transform.GetChild(i);
-        }
-
-        textTransforms = new Transform[content.transform.childCount];
-        for (int i = 0; i < content.transform.childCount; i++)
-        {
-            textTransforms[i] = content.transform.GetChild(i);
-        }
-
-        saveButton.onClick.AddListener(SaveData);
-        loadButton.onClick.AddListener(LoadSelectedData);
-        deleteButton.onClick.AddListener(DeleteSelectedFile);
-
-        UpdateFileDropdown();
-
-        fileDropdown.onValueChanged.AddListener(OnDropdownValueChanged);
-
-        if (loadButton != null)
-        {
-            loadButton.onClick.Invoke();
-            Debug.Log("Load button clicked programmatically at startup.");
-        }
-        else
-        {
-            Debug.LogWarning("Load button is not assigned.");
-        }
+        objTransforms[i] = transform.GetChild(i);
     }
+
+    textTransforms = new Transform[content.transform.childCount];
+    for (int i = 0; i < content.transform.childCount; i++)
+    {
+        textTransforms[i] = content.transform.GetChild(i);
+    }
+
+    saveButton.onClick.AddListener(SaveData);
+    loadButton.onClick.AddListener(LoadSelectedData);
+    deleteButton.onClick.AddListener(DeleteSelectedFile);
+
+    UpdateFileDropdown();
+
+    fileDropdown.onValueChanged.AddListener(OnDropdownValueChanged);
+
+    // Load the most recent file
+    string lastOpenedFile = PlayerPrefs.GetString("LastOpenedFile", null);
+    if (!string.IsNullOrEmpty(lastOpenedFile))
+    {
+        SelectFileFromDropdown(lastOpenedFile);
+        StartCoroutine(InvokeLoadButtonWithDelay());
+    }
+    else if (fileDropdown.options.Count > 0)
+    {
+        StartCoroutine(InvokeLoadButtonWithDelay());
+    }
+}
+
+private void SelectFileFromDropdown(string fileName)
+{
+    int fileIndex = fileDropdown.options.FindIndex(option => option.text == fileName);
+    if (fileIndex != -1)
+    {
+        fileDropdown.value = fileIndex;
+        fileNameInput.text = fileName;
+    }
+    else
+    {
+        Debug.LogWarning($"File {fileName} not found in dropdown. Defaulting to the first available file.");
+    }
+}
+
+private IEnumerator InvokeLoadButtonWithDelay()
+{
+    yield return new WaitForSeconds(0.3f); // Wait for 3 seconds
+    loadButton.onClick.Invoke();
+    Debug.Log("Load button clicked programmatically after 3-second delay.");
+}
 
     private void OnDropdownValueChanged(int index)
     {
@@ -140,38 +163,38 @@ public class FileManager : MonoBehaviour
         }
     }
 
-    private void UpdateFileDropdown(string selectedFileName = null)
+private void UpdateFileDropdown(string selectedFileName = null)
+{
+    fileDropdown.ClearOptions();
+    List<string> fileNames = new List<string>();
+
+    string[] files = Directory.GetFiles(Application.persistentDataPath, "*.json");
+    foreach (string file in files)
     {
-        fileDropdown.ClearOptions();
-        List<string> fileNames = new List<string>();
+        string fileName = Path.GetFileNameWithoutExtension(file);
+        fileNames.Add(fileName);
+    }
 
-        string[] files = Directory.GetFiles(Application.persistentDataPath, "*.json");
-        foreach (string file in files)
+    fileDropdown.AddOptions(fileNames);
+
+    if (fileNames.Count > 0)
+    {
+        if (!string.IsNullOrEmpty(selectedFileName) && fileNames.Contains(selectedFileName))
         {
-            string fileName = Path.GetFileNameWithoutExtension(file);
-            fileNames.Add(fileName);
-        }
-
-        fileDropdown.AddOptions(fileNames);
-
-        if (fileNames.Count > 0)
-        {
-            if (!string.IsNullOrEmpty(selectedFileName) && fileNames.Contains(selectedFileName))
-            {
-                fileNameInput.text = selectedFileName;
-                fileDropdown.value = fileNames.IndexOf(selectedFileName);
-            }
-            else
-            {
-                fileNameInput.text = fileNames[0];
-                fileDropdown.value = 0;
-            }
+            fileNameInput.text = selectedFileName;
+            fileDropdown.value = fileNames.IndexOf(selectedFileName);
         }
         else
         {
-            fileNameInput.text = "";
+            fileNameInput.text = fileNames[0];
+            fileDropdown.value = 0;
         }
     }
+    else
+    {
+        fileNameInput.text = "";
+    }
+}
 
  private void ApplyLoadedData()
     {
@@ -250,7 +273,7 @@ private IEnumerator SendMessagesWithDelay()
         messagePan.AddValue(OSCValue.Int(normalizedAngle));
 
         Transmitter.Send(messagePan);
-        Debug.Log($"Sent OSC message: Object {objectNumber}, Angle {normalizedAngle} degrees");
+        // Debug.Log($"Sent OSC message: Object {objectNumber}, Angle {normalizedAngle} degrees");
 
         yield return new WaitForSeconds(delay); // Wait before sending the next message
     }

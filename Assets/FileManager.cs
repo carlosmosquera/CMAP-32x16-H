@@ -15,10 +15,9 @@ public class FileManager : MonoBehaviour
     public Button deleteButton;
     public InputField fileNameInput;
     public Dropdown fileDropdown;
-    public OSCTransmitter Transmitter;
-
     public CustomZoneSpawner customZoneSpawner; // Reference to CustomZoneSpawner
     public Toggle toggle; // Reference to the Toggle UI element
+    public OSCTransmitter Transmitter; // Add reference to OSC Transmitter
 
     private List<Vector3> savedPositions = new List<Vector3>();
     private List<string> savedTexts = new List<string>();
@@ -29,41 +28,38 @@ public class FileManager : MonoBehaviour
     private Transform[] textTransforms;
     public Button externalButton; // Reference to the external button
 
-void Start()
-{
-    objTransforms = new Transform[transform.childCount];
-    for (int i = 0; i < transform.childCount; i++)
+    void Start()
     {
-        objTransforms[i] = transform.GetChild(i);
+        objTransforms = new Transform[transform.childCount];
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            objTransforms[i] = transform.GetChild(i);
+        }
+
+        textTransforms = new Transform[content.transform.childCount];
+        for (int i = 0; i < content.transform.childCount; i++)
+        {
+            textTransforms[i] = content.transform.GetChild(i);
+        }
+
+        saveButton.onClick.AddListener(SaveData);
+        loadButton.onClick.AddListener(LoadSelectedData);
+        deleteButton.onClick.AddListener(DeleteSelectedFile);
+
+        UpdateFileDropdown();
+
+        fileDropdown.onValueChanged.AddListener(OnDropdownValueChanged);
+
+        if (loadButton != null)
+        {
+            loadButton.onClick.Invoke();
+            Debug.Log("Load button clicked programmatically at startup.");
+        }
+        else
+        {
+            Debug.LogWarning("Load button is not assigned.");
+        }
     }
-
-    textTransforms = new Transform[content.transform.childCount];
-    for (int i = 0; i < content.transform.childCount; i++)
-    {
-        textTransforms[i] = content.transform.GetChild(i);
-    }
-
-    saveButton.onClick.AddListener(SaveData);
-    loadButton.onClick.AddListener(LoadSelectedData);
-    deleteButton.onClick.AddListener(DeleteSelectedFile);
-
-    UpdateFileDropdown();
-
-
-
-    fileDropdown.onValueChanged.AddListener(OnDropdownValueChanged);
-
-        // Simulate clicking the Load button at the start
-    if (loadButton != null)
-    {
-        loadButton.onClick.Invoke();
-        Debug.Log("Load button clicked programmatically at startup.");
-    }
-    else
-    {
-        Debug.LogWarning("Load button is not assigned.");
-    }
-}
 
     private void OnDropdownValueChanged(int index)
     {
@@ -71,59 +67,60 @@ void Start()
     }
 
     void SaveData()
-{
-    string fileName = fileNameInput.text.Trim();
-    if (string.IsNullOrEmpty(fileName))
     {
-        Debug.LogWarning("File name is empty!");
-        return;
-    }
-
-    savedPositions.Clear();
-    savedTexts.Clear();
-    savedAngles.Clear();
-
-    foreach (Transform child in objTransforms)
-    {
-        savedPositions.Add(child.position);
-    }
-
-    foreach (Transform child in textTransforms)
-    {
-        TMP_InputField inputField = child.GetComponentInChildren<TMP_InputField>();
-        if (inputField != null)
+        string fileName = fileNameInput.text.Trim();
+        if (string.IsNullOrEmpty(fileName))
         {
-            savedTexts.Add(inputField.text);
+            Debug.LogWarning("File name is empty!");
+            return;
         }
-        else
+
+        savedPositions.Clear();
+        savedTexts.Clear();
+        savedAngles.Clear();
+
+        foreach (Transform child in objTransforms)
         {
-            savedTexts.Add("");
+            savedPositions.Add(child.position);
         }
+
+        foreach (Transform child in textTransforms)
+        {
+            TMP_InputField inputField = child.GetComponentInChildren<TMP_InputField>();
+            if (inputField != null)
+            {
+                savedTexts.Add(inputField.text);
+            }
+            else
+            {
+                savedTexts.Add("");
+            }
+        }
+
+        savedAngles.AddRange(customZoneSpawner.degreeAngles);
+        customZoneInputValue = customZoneSpawner.inputField != null ? customZoneSpawner.inputField.text : "";
+
+        toggleState = toggle != null && toggle.isOn;
+
+        SaveDataToFile(fileName);
+        PlayerPrefs.SetString("LastOpenedFile", fileName);
+        PlayerPrefs.Save();
+        Debug.Log($"Data saved to {fileName}");
+        UpdateFileDropdown(fileName);
     }
 
-    savedAngles.AddRange(customZoneSpawner.degreeAngles);
-    customZoneInputValue = customZoneSpawner.inputField != null ? customZoneSpawner.inputField.text : "";
+    void LoadSelectedData()
+    {
+        int selectedIndex = fileDropdown.value;
+        string fileName = fileDropdown.options[selectedIndex].text;
 
-    toggleState = toggle != null && toggle.isOn;
+        LoadDataFromFile(fileName);
+        ApplyLoadedData();
+        SendPositionToAllObjects(); // Send OSC messages after loading data
 
-    SaveDataToFile(fileName);
-    PlayerPrefs.SetString("LastOpenedFile", fileName); // Save the most recent file name
-    PlayerPrefs.Save();
-    Debug.Log($"Data saved to {fileName}");
-    UpdateFileDropdown(fileName);
-}
-
-void LoadSelectedData()
-{
-    int selectedIndex = fileDropdown.value;
-    string fileName = fileDropdown.options[selectedIndex].text;
-
-    LoadDataFromFile(fileName);
-    ApplyLoadedData();
-
-    PlayerPrefs.SetString("LastOpenedFile", fileName); // Update last opened file
-    PlayerPrefs.Save();
-}
+        PlayerPrefs.SetString("LastOpenedFile", fileName);
+        PlayerPrefs.Save();
+    }
 
     void DeleteSelectedFile()
     {
@@ -176,78 +173,90 @@ void LoadSelectedData()
         }
     }
 
-private void ApplyLoadedData()
-{
-    if (savedPositions.Count != objTransforms.Length || savedTexts.Count != textTransforms.Length)
+ private void ApplyLoadedData()
     {
-        Debug.LogWarning("No saved data or number of children has changed");
+        if (savedPositions.Count != objTransforms.Length || savedTexts.Count != textTransforms.Length)
+        {
+            Debug.LogWarning("No saved data or number of children has changed");
+            return;
+        }
+
+        for (int i = 0; i < objTransforms.Length; i++)
+        {
+            objTransforms[i].position = savedPositions[i];
+        }
+
+        for (int i = 0; i < textTransforms.Length; i++)
+        {
+            TMP_InputField inputField = textTransforms[i].GetComponentInChildren<TMP_InputField>();
+            if (inputField != null)
+            {
+                inputField.text = savedTexts[i];
+            }
+        }
+
+        if (customZoneSpawner.inputField != null)
+        {
+            customZoneSpawner.inputField.text = customZoneInputValue;
+            customZoneSpawner.inputField.onEndEdit.Invoke(customZoneInputValue);
+        }
+
+        customZoneSpawner.UpdateAngleInputFields();
+        customZoneSpawner.SpawnObjects();
+
+        if (toggle != null)
+        {
+            toggle.isOn = toggleState;
+        }
+
+        Debug.Log("Data loaded and applied");
+
+        if (externalButton != null)
+        {
+            externalButton.onClick.Invoke();
+            Debug.Log("External button was pressed programmatically.");
+        }
+        else
+        {
+            Debug.LogWarning("External button is not assigned.");
+        }
+    }
+
+private void SendPositionToAllObjects()
+{
+    if (Transmitter == null)
+    {
+        Debug.LogError("OSC Transmitter is not assigned in the Inspector!");
         return;
     }
 
+    StartCoroutine(SendMessagesWithDelay());
+}
+
+private IEnumerator SendMessagesWithDelay()
+{
+    float delay = 0.1f; // Adjust the delay as needed (e.g., 0.1 seconds between messages)
+
     for (int i = 0; i < objTransforms.Length; i++)
     {
-        objTransforms[i].position = savedPositions[i];
+        Transform objTransform = objTransforms[i];
+        int objectNumber = i + 1;
+
+        float polarAngle = Mathf.Atan2(-objTransform.position.y, objTransform.position.x) * Mathf.Rad2Deg;
+        int normalizedAngle = Mathf.RoundToInt((polarAngle + 90 + 360) % 360);
+
+        var messagePan = new OSCMessage("/objectPosition");
+        messagePan.AddValue(OSCValue.Int(objectNumber));
+        messagePan.AddValue(OSCValue.Int(normalizedAngle));
+
+        Transmitter.Send(messagePan);
+        Debug.Log($"Sent OSC message: Object {objectNumber}, Angle {normalizedAngle} degrees");
+
+        yield return new WaitForSeconds(delay); // Wait before sending the next message
     }
+}
 
-    for (int i = 0; i < textTransforms.Length; i++)
-    {
-        TMP_InputField inputField = textTransforms[i].GetComponentInChildren<TMP_InputField>();
-        if (inputField != null)
-        {
-            inputField.text = savedTexts[i];
-        }
-    }
 
-    // Apply loaded angles to CustomZoneSpawner
-    customZoneSpawner.degreeAngles = new List<float>(savedAngles); // Assign loaded angles directly
-    Debug.Log($"Applying degree angles: {string.Join(", ", savedAngles)}");
-
-    if (customZoneSpawner.inputField != null)
-    {
-        customZoneSpawner.inputField.text = customZoneInputValue;
-        customZoneSpawner.inputField.onEndEdit.Invoke(customZoneInputValue);
-    }
-
-    // Refresh input fields and objects
-    customZoneSpawner.UpdateAngleInputFields();
-    customZoneSpawner.SpawnObjects();
-
-    // Apply toggle state
-    if (toggle != null)
-    {
-        toggle.isOn = toggleState;
-    }
-
-    Debug.Log("Data loaded and applied");
-
-    // Invoke the external button's onClick
-    if (externalButton != null)
-    {
-        externalButton.onClick.Invoke();
-        Debug.Log("External button was pressed programmatically.");
-    }
-    else
-    {
-        Debug.LogWarning("External button is not assigned.");
-    }
-}   
-
-    private IEnumerator SendPositionsViaOSC()
-    {
-        for (int i = 0; i < savedPositions.Count; i++)
-        {
-            float outPolarFloat = Mathf.Atan2(savedPositions[i].y, savedPositions[i].x) * Mathf.Rad2Deg;
-            int outPolar = Mathf.RoundToInt((450 - outPolarFloat) % 360);
-            int objectNumber = i + 1;
-
-            var message = new OSCMessage("/objectPosition");
-            message.AddValue(OSCValue.Int(objectNumber));
-            message.AddValue(OSCValue.Int(outPolar));
-
-            Transmitter.Send(message);
-            yield return new WaitForSeconds(0.1f);
-        }
-    }
 
 void SaveDataToFile(string fileName)
 {

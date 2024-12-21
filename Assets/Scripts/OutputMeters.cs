@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,162 +7,149 @@ public class OutputMeters : MonoBehaviour
 {
     public OSCReceiver OSCReceiver;
 
-
-    private string _channel1LevelOut = "/channelOut/1";
-    private string _channel2LevelOut = "/channelOut/2";
-    private string _channel3LevelOut = "/channelOut/3";
-    private string _channel4LevelOut = "/channelOut/4";
-    private string _channel5LevelOut = "/channelOut/5";
-    private string _channel6LevelOut = "/channelOut/6";
-    private string _channel7LevelOut = "/channelOut/7";
-    private string _channel8LevelOut = "/channelOut/8";
-    private string _channel9LevelOut = "/channelOut/9";
-    private string _channel10LevelOut = "/channelOut/10";
-
-
-    public Slider channel1Out;
-    public Slider channel2Out;
-    public Slider channel3Out;
-    public Slider channel4Out;
-    public Slider channel5Out;
-    public Slider channel6Out;
-    public Slider channel7Out;
-    public Slider channel8Out;
-    public Slider channel9Out;
-    public Slider channel10Out;
-
+    private readonly string _channelLevelOutBase = "/channelOut/";
+    public GameObject sliderPrefab; // Prefab for the slider
+    public InputField sliderCountInput; // Input field for user to specify number of sliders
+    public Transform sliderContainer; // Parent object to hold the sliders
+    public Toggle extraSlidersToggle; // Toggle for adding two extra sliders
+    public float spacing = 50f; // Space between main sliders
+    public float extraSpacing = 100f; // Space between extra sliders and the last main slider
+    private List<Slider> channelSliders = new List<Slider>();
 
     // Start is called before the first frame update
     void Start()
     {
-
-
-        OSCReceiver.Bind(_channel1LevelOut, ReceivedOutput1);
-        OSCReceiver.Bind(_channel2LevelOut, ReceivedOutput2);
-        OSCReceiver.Bind(_channel3LevelOut, ReceivedOutput3);
-        OSCReceiver.Bind(_channel4LevelOut, ReceivedOutput4);
-        OSCReceiver.Bind(_channel5LevelOut, ReceivedOutput5);
-        OSCReceiver.Bind(_channel6LevelOut, ReceivedOutput6);
-        OSCReceiver.Bind(_channel7LevelOut, ReceivedOutput7);
-
-        OSCReceiver.Bind(_channel8LevelOut, ReceivedOutput8);
-        OSCReceiver.Bind(_channel9LevelOut, ReceivedOutput9);
-        OSCReceiver.Bind(_channel10LevelOut, ReceivedOutput10);
-
-    }
-
-
-    // -------- OUTPUT ------------
-
-    public void ReceivedOutput1(OSCMessage message)
-    {
-        //Debug.Log("channel1Out" + message);
-
-        if (message.ToFloat(out var value))
+        sliderCountInput.onEndEdit.AddListener(CreateSliders);
+        if (extraSlidersToggle != null)
         {
-            channel1Out.value = value;
+            extraSlidersToggle.onValueChanged.AddListener(delegate { CreateSliders(sliderCountInput.text); });
         }
 
+        for (int i = 1; i <= 16; i++)
+        {
+            int channelIndex = i; // Capture the current index for the closure
+            OSCReceiver.Bind($"{_channelLevelOutBase}{channelIndex}", message => ReceivedOutput(channelIndex, message));
+        }
     }
 
-    public void ReceivedOutput2(OSCMessage message)
+    // Create sliders dynamically based on user input
+private void CreateSliders(string input)
+{
+    if (int.TryParse(input, out int sliderCount))
     {
-        //Debug.Log("channel2Out" + message);
-
-        if (message.ToFloat(out var value))
+        // Clear existing sliders
+        foreach (Transform child in sliderContainer)
         {
-            channel2Out.value = value;
+            Destroy(child.gameObject);
+        }
+        channelSliders.Clear();
+
+        // Instantiate main sliders
+        for (int i = 0; i < sliderCount; i++)
+        {
+            // Instantiate slider prefab
+            GameObject sliderObj = Instantiate(sliderPrefab, sliderContainer);
+
+            // Ensure the slider object is active
+            sliderObj.SetActive(true);
+
+            // Position the slider
+            sliderObj.transform.localPosition = new Vector3(i * spacing, 0, 0);
+
+            // Set the label text
+            Text labelText = sliderObj.GetComponentInChildren<Text>();
+            if (labelText != null)
+            {
+                labelText.text = $"{i + 1}"; // Number starting from 1 for main sliders
+            }
+
+            // Get the Slider component and add it to the list
+            Slider slider = sliderObj.GetComponent<Slider>();
+            if (slider != null)
+            {
+                channelSliders.Add(slider);
+            }
+            else
+            {
+                Debug.LogError("The instantiated object does not have a Slider component.");
+            }
         }
 
+        // Check if the toggle is on
+        if (extraSlidersToggle != null && extraSlidersToggle.isOn)
+        {
+            // Calculate the starting position for the extra sliders
+            float extraStartPosition = sliderCount * spacing + extraSpacing;
+
+            // Add two extra sliders
+            for (int i = 0; i < 2; i++)
+            {
+                GameObject extraSliderObj = Instantiate(sliderPrefab, sliderContainer);
+
+                // Ensure the slider object is active
+                extraSliderObj.SetActive(true);
+
+                // Position the extra slider
+                extraSliderObj.transform.localPosition = new Vector3(extraStartPosition + (i * spacing), 0, 0);
+
+                // Set the label text for extra sliders
+                Text labelText = extraSliderObj.GetComponentInChildren<Text>();
+                if (labelText != null)
+                {
+                    labelText.text = $"{sliderCount + i + 1}"; // Continue numbering from the main sliders
+                }
+
+                // Get the Slider component and add it to the list
+                Slider extraSlider = extraSliderObj.GetComponent<Slider>();
+                if (extraSlider != null)
+                {
+                    channelSliders.Add(extraSlider);
+                }
+                else
+                {
+                    Debug.LogError("The instantiated extra object does not have a Slider component.");
+                }
+            }
+        }
     }
-
-    public void ReceivedOutput3(OSCMessage message)
+    else
     {
-        //Debug.Log("channel3Out" + message);
+        Debug.LogError("Invalid input for slider count.");
+    }
+}
 
+    // Generic Output Handler with decibel conversion
+    public void ReceivedOutput(int channelIndex, OSCMessage message)
+    {
         if (message.ToFloat(out var value))
         {
-            channel3Out.value = value;
-        }
+            if (channelIndex - 1 < channelSliders.Count)
+            {
+                // Convert linear value to decibel scale
+                float dBValue = LinearToDecibel(value);
 
+                // Map the dB value to a slider range (e.g., -70 dB to 0 dB => 0.0 to 1.0)
+                float normalizedValue = MapDecibelToSlider(dBValue, -70f, 0f);
+
+                // Update the slider value
+                channelSliders[channelIndex - 1].value = normalizedValue;
+            }
+        }
     }
 
-    public void ReceivedOutput4(OSCMessage message)
+    // Convert linear amplitude (0.0 to 1.0) to decibels (-∞ to 0 dB)
+    private float LinearToDecibel(float linearValue)
     {
-        //Debug.Log("channel4Out" + message);
+        // Avoid logarithm of zero by clamping the minimum value
+        linearValue = Mathf.Max(linearValue, 0.0001f);
 
-        if (message.ToFloat(out var value))
-        {
-            channel4Out.value = value;
-        }
-
+        // Convert to decibel scale
+        return 20f * Mathf.Log10(linearValue);
     }
 
-    public void ReceivedOutput5(OSCMessage message)
+    // Map decibel values to slider range (e.g., -70 dB to 0 dB -> 0.0 to 1.0)
+    private float MapDecibelToSlider(float dBValue, float minDB, float maxDB)
     {
-        //Debug.Log("channel5Out" + message);
-
-        if (message.ToFloat(out var value))
-        {
-            channel5Out.value = value;
-        }
-
+        return Mathf.InverseLerp(minDB, maxDB, dBValue);
     }
-
-    public void ReceivedOutput6(OSCMessage message)
-    {
-        //Debug.Log("channel6Out" + message);
-
-        if (message.ToFloat(out var value))
-        {
-            channel6Out.value = value;
-        }
-
-    }
-
-    public void ReceivedOutput7(OSCMessage message)
-    {
-        //Debug.Log("channel7Out" + message);
-
-        if (message.ToFloat(out var value))
-        {
-            channel7Out.value = value;
-        }
-
-    }
-
-    public void ReceivedOutput8(OSCMessage message)
-    {
-        //Debug.Log("channel8Out" + message);
-
-        if (message.ToFloat(out var value))
-        {
-            channel8Out.value = value;
-        }
-
-    }
-
-    public void ReceivedOutput9(OSCMessage message)
-    {
-        //Debug.Log("channel9Out" + message);
-
-        if (message.ToFloat(out var value))
-        {
-            channel9Out.value = value;
-        }
-
-    }
-
-    public void ReceivedOutput10(OSCMessage message)
-    {
-        //Debug.Log("channel10Out" + message);
-
-        if (message.ToFloat(out var value))
-        {
-            channel10Out.value = value;
-        }
-
-    }
-
-
 }

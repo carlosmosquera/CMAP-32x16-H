@@ -29,33 +29,41 @@ public class FileManager : MonoBehaviour
     private Transform[] textTransforms;
     public Button externalButton; // Reference to the external button
 
-    void Start()
+void Start()
+{
+    objTransforms = new Transform[transform.childCount];
+    for (int i = 0; i < transform.childCount; i++)
     {
-        objTransforms = new Transform[transform.childCount];
-        for (int i = 0; i < transform.childCount; i++)
-        {
-            objTransforms[i] = transform.GetChild(i);
-        }
-
-        textTransforms = new Transform[content.transform.childCount];
-        for (int i = 0; i < content.transform.childCount; i++)
-        {
-            textTransforms[i] = content.transform.GetChild(i);
-        }
-
-        saveButton.onClick.AddListener(SaveData);
-        loadButton.onClick.AddListener(LoadSelectedData);
-        deleteButton.onClick.AddListener(DeleteSelectedFile);
-
-        UpdateFileDropdown();
-
-        if (fileDropdown.options.Count > 0)
-        {
-            fileNameInput.text = fileDropdown.options[0].text;
-        }
-
-        fileDropdown.onValueChanged.AddListener(OnDropdownValueChanged);
+        objTransforms[i] = transform.GetChild(i);
     }
+
+    textTransforms = new Transform[content.transform.childCount];
+    for (int i = 0; i < content.transform.childCount; i++)
+    {
+        textTransforms[i] = content.transform.GetChild(i);
+    }
+
+    saveButton.onClick.AddListener(SaveData);
+    loadButton.onClick.AddListener(LoadSelectedData);
+    deleteButton.onClick.AddListener(DeleteSelectedFile);
+
+    UpdateFileDropdown();
+
+
+
+    fileDropdown.onValueChanged.AddListener(OnDropdownValueChanged);
+
+        // Simulate clicking the Load button at the start
+    if (loadButton != null)
+    {
+        loadButton.onClick.Invoke();
+        Debug.Log("Load button clicked programmatically at startup.");
+    }
+    else
+    {
+        Debug.LogWarning("Load button is not assigned.");
+    }
+}
 
     private void OnDropdownValueChanged(int index)
     {
@@ -63,56 +71,59 @@ public class FileManager : MonoBehaviour
     }
 
     void SaveData()
+{
+    string fileName = fileNameInput.text.Trim();
+    if (string.IsNullOrEmpty(fileName))
     {
-        string fileName = fileNameInput.text.Trim();
-        if (string.IsNullOrEmpty(fileName))
-        {
-            Debug.LogWarning("File name is empty!");
-            return;
-        }
-
-        savedPositions.Clear();
-        savedTexts.Clear();
-        savedAngles.Clear();
-
-        foreach (Transform child in objTransforms)
-        {
-            savedPositions.Add(child.position);
-        }
-
-        foreach (Transform child in textTransforms)
-        {
-            TMP_InputField inputField = child.GetComponentInChildren<TMP_InputField>();
-            if (inputField != null)
-            {
-                savedTexts.Add(inputField.text);
-            }
-            else
-            {
-                savedTexts.Add("");
-            }
-        }
-
-        // Save data from CustomZoneSpawner
-        savedAngles.AddRange(customZoneSpawner.degreeAngles);
-        customZoneInputValue = customZoneSpawner.inputField != null ? customZoneSpawner.inputField.text : "";
-
-        // Save the Toggle state
-        toggleState = toggle != null && toggle.isOn;
-
-        SaveDataToFile(fileName);
-        Debug.Log($"Data saved to {fileName}");
-        UpdateFileDropdown(fileName);
+        Debug.LogWarning("File name is empty!");
+        return;
     }
 
-    void LoadSelectedData()
-    {
-        int selectedIndex = fileDropdown.value;
-        string fileName = fileDropdown.options[selectedIndex].text;
+    savedPositions.Clear();
+    savedTexts.Clear();
+    savedAngles.Clear();
 
-        LoadDataFromFile(fileName);
-        ApplyLoadedData();
+    foreach (Transform child in objTransforms)
+    {
+        savedPositions.Add(child.position);
     }
+
+    foreach (Transform child in textTransforms)
+    {
+        TMP_InputField inputField = child.GetComponentInChildren<TMP_InputField>();
+        if (inputField != null)
+        {
+            savedTexts.Add(inputField.text);
+        }
+        else
+        {
+            savedTexts.Add("");
+        }
+    }
+
+    savedAngles.AddRange(customZoneSpawner.degreeAngles);
+    customZoneInputValue = customZoneSpawner.inputField != null ? customZoneSpawner.inputField.text : "";
+
+    toggleState = toggle != null && toggle.isOn;
+
+    SaveDataToFile(fileName);
+    PlayerPrefs.SetString("LastOpenedFile", fileName); // Save the most recent file name
+    PlayerPrefs.Save();
+    Debug.Log($"Data saved to {fileName}");
+    UpdateFileDropdown(fileName);
+}
+
+void LoadSelectedData()
+{
+    int selectedIndex = fileDropdown.value;
+    string fileName = fileDropdown.options[selectedIndex].text;
+
+    LoadDataFromFile(fileName);
+    ApplyLoadedData();
+
+    PlayerPrefs.SetString("LastOpenedFile", fileName); // Update last opened file
+    PlayerPrefs.Save();
+}
 
     void DeleteSelectedFile()
     {
@@ -219,7 +230,7 @@ private void ApplyLoadedData()
     {
         Debug.LogWarning("External button is not assigned.");
     }
-}
+}   
 
     private IEnumerator SendPositionsViaOSC()
     {

@@ -16,7 +16,7 @@ public class FileManager : MonoBehaviour
     public InputField fileNameInput;
     public Dropdown fileDropdown;
     public CustomZoneSpawner customZoneSpawner; // Reference to CustomZoneSpawner
-    public Toggle toggle; // Reference to the Toggle UI element
+    public Toggle HeadphonesToggle; // Reference to the Toggle UI element
     public OSCTransmitter Transmitter; // Add reference to OSC Transmitter
 
     private List<Vector3> savedPositions = new List<Vector3>();
@@ -27,6 +27,12 @@ public class FileManager : MonoBehaviour
     private Transform[] objTransforms;
     private Transform[] textTransforms;
     public Button externalButton; // Reference to the external button
+
+    public Toggle DelayToggle; // Reference to the external delay toggle
+    public InputField delayTimeInput; // Reference to the input field for delay time
+
+    private int delayTime; // To store the delay time value as an integer
+
 
 void Start()
 {
@@ -88,49 +94,59 @@ private IEnumerator InvokeLoadButtonWithDelay()
     {
         fileNameInput.text = fileDropdown.options[index].text;
     }
-
-    void SaveData()
+void SaveData()
+{
+    string fileName = fileNameInput.text.Trim();
+    if (string.IsNullOrEmpty(fileName))
     {
-        string fileName = fileNameInput.text.Trim();
-        if (string.IsNullOrEmpty(fileName))
-        {
-            Debug.LogWarning("File name is empty!");
-            return;
-        }
-
-        savedPositions.Clear();
-        savedTexts.Clear();
-        savedAngles.Clear();
-
-        foreach (Transform child in objTransforms)
-        {
-            savedPositions.Add(child.position);
-        }
-
-        foreach (Transform child in textTransforms)
-        {
-            TMP_InputField inputField = child.GetComponentInChildren<TMP_InputField>();
-            if (inputField != null)
-            {
-                savedTexts.Add(inputField.text);
-            }
-            else
-            {
-                savedTexts.Add("");
-            }
-        }
-
-        savedAngles.AddRange(customZoneSpawner.degreeAngles);
-        customZoneInputValue = customZoneSpawner.inputField != null ? customZoneSpawner.inputField.text : "";
-
-        toggleState = toggle != null && toggle.isOn;
-
-        SaveDataToFile(fileName);
-        PlayerPrefs.SetString("LastOpenedFile", fileName);
-        PlayerPrefs.Save();
-        Debug.Log($"Data saved to {fileName}");
-        UpdateFileDropdown(fileName);
+        Debug.LogWarning("File name is empty!");
+        return;
     }
+
+    savedPositions.Clear();
+    savedTexts.Clear();
+    savedAngles.Clear();
+
+    foreach (Transform child in objTransforms)
+    {
+        savedPositions.Add(child.position);
+    }
+
+    foreach (Transform child in textTransforms)
+    {
+        TMP_InputField inputField = child.GetComponentInChildren<TMP_InputField>();
+        if (inputField != null)
+        {
+            savedTexts.Add(inputField.text);
+        }
+        else
+        {
+            savedTexts.Add("");
+        }
+    }
+
+    savedAngles.AddRange(customZoneSpawner.degreeAngles);
+    customZoneInputValue = customZoneSpawner.inputField != null ? customZoneSpawner.inputField.text : "";
+
+    toggleState = HeadphonesToggle != null && HeadphonesToggle.isOn;
+    bool delayToggleState = DelayToggle != null && DelayToggle.isOn;
+
+    // Parse delay time as an integer
+    if (delayTimeInput != null && int.TryParse(delayTimeInput.text, out int parsedDelayTime))
+    {
+        delayTime = parsedDelayTime;
+    }
+    else
+    {
+        delayTime = 0; // Default value if parsing fails
+    }
+
+    SaveDataToFile(fileName, delayToggleState);
+    PlayerPrefs.SetString("LastOpenedFile", fileName);
+    PlayerPrefs.Save();
+    Debug.Log($"Data saved to {fileName}");
+    UpdateFileDropdown(fileName);
+}
 
     void LoadSelectedData()
     {
@@ -196,54 +212,64 @@ private void UpdateFileDropdown(string selectedFileName = null)
     }
 }
 
- private void ApplyLoadedData()
+private void ApplyLoadedData()
+{
+    if (savedPositions.Count != objTransforms.Length || savedTexts.Count != textTransforms.Length)
     {
-        if (savedPositions.Count != objTransforms.Length || savedTexts.Count != textTransforms.Length)
-        {
-            Debug.LogWarning("No saved data or number of children has changed");
-            return;
-        }
+        Debug.LogWarning("No saved data or number of children has changed");
+        return;
+    }
 
-        for (int i = 0; i < objTransforms.Length; i++)
-        {
-            objTransforms[i].position = savedPositions[i];
-        }
+    for (int i = 0; i < objTransforms.Length; i++)
+    {
+        objTransforms[i].position = savedPositions[i];
+    }
 
-        for (int i = 0; i < textTransforms.Length; i++)
+    for (int i = 0; i < textTransforms.Length; i++)
+    {
+        TMP_InputField inputField = textTransforms[i].GetComponentInChildren<TMP_InputField>();
+        if (inputField != null)
         {
-            TMP_InputField inputField = textTransforms[i].GetComponentInChildren<TMP_InputField>();
-            if (inputField != null)
-            {
-                inputField.text = savedTexts[i];
-            }
-        }
-
-        if (customZoneSpawner.inputField != null)
-        {
-            customZoneSpawner.inputField.text = customZoneInputValue;
-            customZoneSpawner.inputField.onEndEdit.Invoke(customZoneInputValue);
-        }
-
-        customZoneSpawner.UpdateAngleInputFields();
-        customZoneSpawner.SpawnObjects();
-
-        if (toggle != null)
-        {
-            toggle.isOn = toggleState;
-        }
-
-        Debug.Log("Data loaded and applied");
-
-        if (externalButton != null)
-        {
-            externalButton.onClick.Invoke();
-            Debug.Log("External button was pressed programmatically.");
-        }
-        else
-        {
-            Debug.LogWarning("External button is not assigned.");
+            inputField.text = savedTexts[i];
         }
     }
+
+    if (customZoneSpawner.inputField != null)
+    {
+        customZoneSpawner.inputField.text = customZoneInputValue;
+        customZoneSpawner.inputField.onEndEdit.Invoke(customZoneInputValue);
+    }
+
+    customZoneSpawner.UpdateAngleInputFields();
+    customZoneSpawner.SpawnObjects();
+
+    if (HeadphonesToggle != null)
+    {
+        HeadphonesToggle.isOn = toggleState;
+    }
+
+    if (DelayToggle != null)
+    {
+        DelayToggle.isOn = toggleState;
+    }
+
+    if (delayTimeInput != null)
+    {
+        delayTimeInput.text = delayTime.ToString();
+    }
+
+    Debug.Log("Data loaded and applied");
+
+    if (externalButton != null)
+    {
+        externalButton.onClick.Invoke();
+        Debug.Log("External button was pressed programmatically.");
+    }
+    else
+    {
+        Debug.LogWarning("External button is not assigned.");
+    }
+}
 
 private void SendPositionToAllObjects()
 {
@@ -281,21 +307,24 @@ private IEnumerator SendMessagesWithDelay()
 
 
 
-void SaveDataToFile(string fileName)
+void SaveDataToFile(string fileName, bool delayToggleState)
 {
     string filePath = Path.Combine(Application.persistentDataPath, $"{fileName}.json");
     Data data = new Data
     {
         positions = savedPositions.ToArray(),
         texts = savedTexts.ToArray(),
-        degreeAngles = savedAngles.ConvertAll(angle => Mathf.RoundToInt(angle)).ToArray(), // Convert floats to integers
+        degreeAngles = savedAngles.ConvertAll(angle => Mathf.RoundToInt(angle)).ToArray(),
         customZoneInputValue = customZoneInputValue,
-        toggleState = toggleState
+        toggleState = toggleState,
+        delayToggleState = delayToggleState,
+        delayTime = delayTime // Store as an integer
     };
     string jsonData = JsonUtility.ToJson(data);
     File.WriteAllText(filePath, jsonData);
     Debug.Log($"Data saved to {filePath}");
 }
+
 
 void LoadDataFromFile(string fileName)
 {
@@ -307,9 +336,21 @@ void LoadDataFromFile(string fileName)
 
         savedTexts = new List<string>(data.texts);
         savedPositions = new List<Vector3>(data.positions);
-        savedAngles = new List<float>(Array.ConvertAll(data.degreeAngles, angle => (float)angle)); // Convert integers to floats for internal use
+        savedAngles = new List<float>(Array.ConvertAll(data.degreeAngles, angle => (float)angle));
         customZoneInputValue = data.customZoneInputValue;
         toggleState = data.toggleState;
+
+        if (DelayToggle != null)
+        {
+            DelayToggle.isOn = data.delayToggleState;
+        }
+
+        delayTime = data.delayTime; // Load delay time as an integer
+
+        if (delayTimeInput != null)
+        {
+            delayTimeInput.text = delayTime.ToString();
+        }
 
         Debug.Log($"Loaded degree angles: {string.Join(", ", data.degreeAngles)}");
     }
@@ -319,13 +360,15 @@ void LoadDataFromFile(string fileName)
     }
 }
 
-    [System.Serializable]
-    public class Data
-    {
-        public Vector3[] positions;
-        public string[] texts;
-        public int[] degreeAngles;
-        public string customZoneInputValue;
-        public bool toggleState; // State of the toggle
-    }
+[System.Serializable]
+public class Data
+{
+    public Vector3[] positions;
+    public string[] texts;
+    public int[] degreeAngles;
+    public string customZoneInputValue;
+    public bool toggleState;
+    public bool delayToggleState; // State of the delay toggle
+    public int delayTime; // Value of the delay time input field as an integer
+}
 }

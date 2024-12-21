@@ -55,33 +55,37 @@ void CreateAngleInputFields()
         if (angleField != null)
         {
             int index = i; // Capture the current index for the delegate
-            angleField.text = degreeAngles[index].ToString(); // Set to current degree angle
+            int angleInt = Mathf.Clamp((int)degreeAngles[index], -999, 999); // Ensure 3-character limit
+            angleField.contentType = InputField.ContentType.IntegerNumber; // Set input field content type to integer
+            angleField.text = angleInt.ToString(); // Set to current degree angle
+            angleField.characterLimit = 3; // Limit input to 3 characters
             angleField.onEndEdit.AddListener(value => UpdateAngleAtIndex(index, value));
             angleInputFields.Add(angleField);
         }
     }
 }
 
-    void UpdateAngleAtIndex(int index, string value)
+void UpdateAngleAtIndex(int index, string value)
+{
+    if (int.TryParse(value, out int angle))
     {
-        if (float.TryParse(value, out float angle))
+        angle = Mathf.Clamp(angle, -999, 999); // Restrict angles to 3-character integers
+        if (index >= degreeAngles.Count)
         {
-            if (index >= degreeAngles.Count)
-            {
-                degreeAngles.Add(angle);
-            }
-            else
-            {
-                degreeAngles[index] = angle;
-            }
-
-            SpawnObjects();
+            degreeAngles.Add(angle);
         }
         else
         {
-            Debug.LogError("Invalid angle input. Please enter a valid number.");
+            degreeAngles[index] = angle;
         }
+
+        SpawnObjects();
     }
+    else
+    {
+        Debug.LogError("Invalid angle input. Please enter a valid number.");
+    }
+}
 
 void UpdateDegreeAngles()
 {
@@ -91,16 +95,19 @@ void UpdateDegreeAngles()
     for (int i = 0; i < numberOfObjects; i++)
     {
         // Use existing input values or default to the calculated step
-        if (i < angleInputFields.Count && float.TryParse(angleInputFields[i].text, out float angle))
+        if (i < angleInputFields.Count && int.TryParse(angleInputFields[i].text, out int angle))
         {
+            angle = Mathf.Clamp(angle, -999, 999); // Restrict angles to 3-character integers
             degreeAngles.Add(angle); // Use the input angle directly
         }
         else
         {
-            degreeAngles.Add(i * angleStep); // Default to evenly distributed angles
+            int defaultAngle = Mathf.Clamp(Mathf.RoundToInt(i * angleStep), -999, 999); // Restrict to 3-character integers
+            degreeAngles.Add(defaultAngle); // Default to evenly distributed angles
         }
     }
 }
+
 
 void SpawnObjectAtAngle(float angle)
 {
@@ -180,7 +187,8 @@ public void UpdateAngleInputFields()
     {
         if (i < degreeAngles.Count)
         {
-            angleInputFields[i].text = Mathf.RoundToInt(degreeAngles[i]).ToString(); // Use loaded angles directly
+            int clampedAngle = Mathf.Clamp(Mathf.RoundToInt(degreeAngles[i]), -999, 999); // Restrict to 3-character integers
+            angleInputFields[i].text = clampedAngle.ToString(); // Use loaded angles directly
         }
         else
         {
@@ -191,41 +199,43 @@ public void UpdateAngleInputFields()
     Debug.Log($"Updated input fields with angles: {string.Join(", ", degreeAngles)}");
 }
 
-    public void SendDegreeAnglesViaOSC()
-    {
-        if (oscTransmitter == null)
-        {
-            Debug.LogError("OSC Transmitter is not set!");
-            return;
-        }
-
-        // Determine the OSC address based on toggle state
-        string addressToSend = oscModeToggle != null && oscModeToggle.isOn ? oscAddress2dHeadphones : oscAddress2d;
-
-        // Create a new OSC message
-        OSCMessage message = new OSCMessage(addressToSend);
-
-        // Add degree angles to the message
-        if (oscModeToggle != null && oscModeToggle.isOn)
-        {
-    // Add a "0" between every degree angle
-        for (int i = 0; i < degreeAngles.Count; i++)
-         {
-        message.AddValue(OSCValue.Int((int)degreeAngles[i])); // Explicitly cast float to int
-        message.AddValue(OSCValue.Int(0)); // Add "0" after each angle
-             }
-        }
-        else
+public void SendDegreeAnglesViaOSC()
 {
-    foreach (float angle in degreeAngles)
+    if (oscTransmitter == null)
     {
-        message.AddValue(OSCValue.Int((int)angle)); // Explicitly cast float to int
+        Debug.LogError("OSC Transmitter is not set!");
+        return;
     }
+
+    // Determine the OSC address based on toggle state
+    string addressToSend = oscModeToggle != null && oscModeToggle.isOn ? oscAddress2dHeadphones : oscAddress2d;
+
+    // Create a new OSC message
+    OSCMessage message = new OSCMessage(addressToSend);
+
+    // Add degree angles to the message
+    if (oscModeToggle != null && oscModeToggle.isOn)
+    {
+        // Add a "0" between every degree angle
+        for (int i = 0; i < degreeAngles.Count; i++)
+        {
+            int clampedAngle = Mathf.Clamp((int)degreeAngles[i], -999, 999); // Restrict to 3-character integers
+            message.AddValue(OSCValue.Int(clampedAngle)); // Explicitly cast float to int
+            message.AddValue(OSCValue.Int(0)); // Add "0" after each angle
+        }
+    }
+    else
+    {
+        foreach (float angle in degreeAngles)
+        {
+            int clampedAngle = Mathf.Clamp((int)angle, -999, 999); // Restrict to 3-character integers
+            message.AddValue(OSCValue.Int(clampedAngle)); // Explicitly cast float to int
+        }
+    }
+
+    // Send the message
+    oscTransmitter.Send(message);
+
+    Debug.Log($"Degree angles sent via OSC to {addressToSend}.");
 }
-
-        // Send the message
-        oscTransmitter.Send(message);
-
-        Debug.Log($"Degree angles sent via OSC to {addressToSend}.");
-    }
 }

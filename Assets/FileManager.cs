@@ -23,7 +23,7 @@ public class FileManager : MonoBehaviour
     private List<string> savedTexts = new List<string>();
     private List<float> savedAngles = new List<float>(); // To store degree angles
     private string customZoneInputValue = ""; // To store CustomZoneSpawner input field value
-    private bool toggleState; // To save the state of the Toggle UI element
+    private bool HeadphonesToggleState; // To save the state of the Toggle UI element
     private Transform[] objTransforms;
     private Transform[] textTransforms;
     public Button externalButton; // Reference to the external button
@@ -128,7 +128,7 @@ void SaveData()
     savedAngles.AddRange(customZoneSpawner.degreeAngles);
     customZoneInputValue = customZoneSpawner.inputField != null ? customZoneSpawner.inputField.text : "";
 
-    toggleState = HeadphonesToggle != null && HeadphonesToggle.isOn;
+    HeadphonesToggleState = HeadphonesToggle != null && HeadphonesToggle.isOn;
     bool delayToggleState = DelayToggle != null && DelayToggle.isOn;
 
     // Parse delay time as an integer
@@ -216,15 +216,17 @@ private void ApplyLoadedData()
 {
     if (savedPositions.Count != objTransforms.Length || savedTexts.Count != textTransforms.Length)
     {
-        Debug.LogWarning("No saved data or number of children has changed");
+        Debug.LogWarning("No saved data or the number of children has changed.");
         return;
     }
 
+    // Apply positions to objects
     for (int i = 0; i < objTransforms.Length; i++)
     {
         objTransforms[i].position = savedPositions[i];
     }
 
+    // Apply texts to input fields
     for (int i = 0; i < textTransforms.Length; i++)
     {
         TMP_InputField inputField = textTransforms[i].GetComponentInChildren<TMP_InputField>();
@@ -234,23 +236,29 @@ private void ApplyLoadedData()
         }
     }
 
-    if (customZoneSpawner.inputField != null)
+    // Apply degree angles and update input fields
+    if (customZoneSpawner != null)
+    {
+        customZoneSpawner.degreeAngles = new List<float>(savedAngles); // Synchronize angles
+        customZoneSpawner.UpdateAngleInputFields(); // Update UI input fields
+        customZoneSpawner.SpawnObjects(); // Respawn objects based on new angles
+    }
+
+    // Apply other UI states
+    if (customZoneSpawner != null && customZoneSpawner.inputField != null)
     {
         customZoneSpawner.inputField.text = customZoneInputValue;
         customZoneSpawner.inputField.onEndEdit.Invoke(customZoneInputValue);
     }
 
-    customZoneSpawner.UpdateAngleInputFields();
-    customZoneSpawner.SpawnObjects();
-
     if (HeadphonesToggle != null)
     {
-        HeadphonesToggle.isOn = toggleState;
+        HeadphonesToggle.isOn = HeadphonesToggleState;
     }
 
     if (DelayToggle != null)
     {
-        DelayToggle.isOn = toggleState;
+        DelayToggle.isOn = HeadphonesToggleState;
     }
 
     if (delayTimeInput != null)
@@ -258,8 +266,9 @@ private void ApplyLoadedData()
         delayTimeInput.text = delayTime.ToString();
     }
 
-    Debug.Log("Data loaded and applied");
+    Debug.Log("Data loaded and applied.");
 
+    // Trigger external button, if assigned
     if (externalButton != null)
     {
         externalButton.onClick.Invoke();
@@ -316,7 +325,7 @@ void SaveDataToFile(string fileName, bool delayToggleState)
         texts = savedTexts.ToArray(),
         degreeAngles = savedAngles.ConvertAll(angle => Mathf.RoundToInt(angle)).ToArray(),
         customZoneInputValue = customZoneInputValue,
-        toggleState = toggleState,
+        headToggleState = HeadphonesToggleState,
         delayToggleState = delayToggleState,
         delayTime = delayTime // Store as an integer
     };
@@ -324,7 +333,6 @@ void SaveDataToFile(string fileName, bool delayToggleState)
     File.WriteAllText(filePath, jsonData);
     Debug.Log($"Data saved to {filePath}");
 }
-
 
 void LoadDataFromFile(string fileName)
 {
@@ -334,25 +342,45 @@ void LoadDataFromFile(string fileName)
         string jsonData = File.ReadAllText(filePath);
         Data data = JsonUtility.FromJson<Data>(jsonData);
 
+        // Load data into local variables
         savedTexts = new List<string>(data.texts);
         savedPositions = new List<Vector3>(data.positions);
         savedAngles = new List<float>(Array.ConvertAll(data.degreeAngles, angle => (float)angle));
         customZoneInputValue = data.customZoneInputValue;
-        toggleState = data.toggleState;
+        HeadphonesToggleState = data.headToggleState;
 
+        // Ensure all saved angles are applied to CustomZoneSpawner
+        if (customZoneSpawner != null)
+        {
+            // Update the degreeAngles list to match the saved angles
+            customZoneSpawner.degreeAngles = new List<float>(savedAngles);
+
+            // Synchronize the number of input fields with the loaded angles
+            customZoneSpawner.numberOfObjects = savedAngles.Count;
+
+            // Recreate input fields to match the new degreeAngles list
+            customZoneSpawner.CreateAngleInputFields();
+
+            // Update the input fields with the loaded angles
+            customZoneSpawner.UpdateAngleInputFields();
+
+            // Spawn objects based on the loaded angles
+            customZoneSpawner.SpawnObjects();
+        }
+
+        // Apply other UI states
         if (DelayToggle != null)
         {
             DelayToggle.isOn = data.delayToggleState;
         }
 
-        delayTime = data.delayTime; // Load delay time as an integer
-
+        delayTime = data.delayTime;
         if (delayTimeInput != null)
         {
             delayTimeInput.text = delayTime.ToString();
         }
 
-        Debug.Log($"Loaded degree angles: {string.Join(", ", data.degreeAngles)}");
+        Debug.Log($"Loaded degree angles: {string.Join(", ", savedAngles)}");
     }
     else
     {
@@ -367,7 +395,7 @@ public class Data
     public string[] texts;
     public int[] degreeAngles;
     public string customZoneInputValue;
-    public bool toggleState;
+    public bool headToggleState;
     public bool delayToggleState; // State of the delay toggle
     public int delayTime; // Value of the delay time input field as an integer
 }

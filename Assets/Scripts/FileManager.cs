@@ -163,23 +163,30 @@ void SaveData()
         PlayerPrefs.Save();
     }
 
-    void DeleteSelectedFile()
-    {
-        int selectedIndex = fileDropdown.value;
-        string fileName = fileDropdown.options[selectedIndex].text;
+void DeleteSelectedFile()
+{
+    int selectedIndex = fileDropdown.value;
+    string fileName = fileDropdown.options[selectedIndex].text;
 
-        string filePath = Path.Combine(Application.persistentDataPath, $"{fileName}.json");
-        if (File.Exists(filePath))
-        {
-            File.Delete(filePath);
-            Debug.Log($"File {fileName} deleted.");
-            UpdateFileDropdown();
-        }
-        else
-        {
-            Debug.LogWarning($"File {fileName} does not exist!");
-        }
+    // Prevent deletion of "New File"
+    if (fileName == "New File")
+    {
+        Debug.LogWarning("The 'New File' file cannot be deleted.");
+        return;
     }
+
+    string filePath = Path.Combine(Application.persistentDataPath, $"{fileName}.json");
+    if (File.Exists(filePath))
+    {
+        File.Delete(filePath);
+        Debug.Log($"File {fileName} deleted.");
+        UpdateFileDropdown();
+    }
+    else
+    {
+        Debug.LogWarning($"File {fileName} does not exist!");
+    }
+}
 
 private void UpdateFileDropdown(string selectedFileName = null)
 {

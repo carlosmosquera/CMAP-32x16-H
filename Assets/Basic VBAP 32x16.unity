@@ -5122,6 +5122,7 @@ GameObject:
   m_Component:
   - component: {fileID: 239388909}
   - component: {fileID: 239388910}
+  - component: {fileID: 239388911}
   m_Layer: 0
   m_Name: SPEAKER CONFIG
   m_TagString: Untagged
@@ -5164,6 +5165,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   toggle: {fileID: 87698136}
   targetGameObject: {fileID: 2117546744}
+--- !u!114 &239388911
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 239388908}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8858b6c6cd1f24e989574c82d382ec70, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  blinkingButton: {fileID: 802164364}
+  toggle1: {fileID: 87698136}
+  toggle2: {fileID: 671495609}
+  inputField1: {fileID: 992801946}
+  inputField2: {fileID: 1173211225}
 --- !u!1 &242413825
 GameObject:
   m_ObjectHideFlags: 0
@@ -33924,7 +33942,7 @@ MonoBehaviour:
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
   m_fontSizeMax: 72
-  m_fontStyle: 2
+  m_fontStyle: 1
   m_HorizontalAlignment: 1
   m_VerticalAlignment: 256
   m_textAlignment: 65535
@@ -43664,6 +43682,7 @@ GameObject:
   - component: {fileID: 1809266984}
   - component: {fileID: 1809266986}
   - component: {fileID: 1809266987}
+  - component: {fileID: 1809266988}
   m_Layer: 5
   m_Name: Network
   m_TagString: Untagged
@@ -43769,6 +43788,19 @@ MonoBehaviour:
   connectionIndicator: {fileID: 1414924923}
   heartbeatInterval: 1
   connectionTimeout: 2
+--- !u!114 &1809266988
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1809266982}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0bf7e210544724279a95983dbc89bf0d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ipInputField: {fileID: 1327452884}
 --- !u!1 &1811998997
 GameObject:
   m_ObjectHideFlags: 0
@@ -44782,7 +44814,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -1557, y: 328}
+  m_AnchoredPosition: {x: -1160, y: 499}
   m_SizeDelta: {x: 292.4, y: -57.3}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1835860407
@@ -44798,7 +44830,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.30263197, g: 1, b: 0, a: 0.392}
+  m_Color: {r: 0.2924528, g: 0, b: 0.27665508, a: 0.392}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1

@@ -281,7 +281,7 @@ private void ApplyLoadedData()
     if (externalButton != null)
     {
         externalButton.onClick.Invoke();
-        Debug.Log("External button was pressed programmatically.");
+        // Debug.Log("External button was pressed programmatically.");
     }
     else
     {

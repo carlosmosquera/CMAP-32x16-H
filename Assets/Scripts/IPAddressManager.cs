@@ -24,7 +24,7 @@ public class IPAddressManager : MonoBehaviour
         // Save the IP address to PlayerPrefs
         PlayerPrefs.SetString(IPKey, ipAddress.Trim());
         PlayerPrefs.Save();
-        Debug.Log($"IP Address Saved: {ipAddress}");
+        // Debug.Log($"IP Address Saved: {ipAddress}");
     }
 
     void OnApplicationQuit()

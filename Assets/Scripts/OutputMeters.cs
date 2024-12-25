@@ -25,7 +25,7 @@ public class OutputMeters : MonoBehaviour
             extraSlidersToggle.onValueChanged.AddListener(delegate { CreateSliders(sliderCountInput.text); });
         }
 
-        for (int i = 1; i <= 16; i++)
+        for (int i = 1; i <= 18; i++)
         {
             int channelIndex = i; // Capture the current index for the closure
             OSCReceiver.Bind($"{_channelLevelOutBase}{channelIndex}", message => ReceivedOutput(channelIndex, message));

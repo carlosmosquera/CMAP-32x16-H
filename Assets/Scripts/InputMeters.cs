@@ -90,65 +90,65 @@ private void UpdateSliderColor(int index, float value)
 {
     if (index >= 0 && index < sliderFillImages.Count)
     {
+        // Convert slider value (0.0 to 1.0) to dB value (-70 dB to 0 dB)
+        float dBValue = Mathf.Lerp(-70f, 0f, value);
+
+        Debug.Log($"UpdateSliderColor called for index: {index}, value: {value}, dBValue: {dBValue}");
+
         Image fillImage = sliderFillImages[index];
 
-        // Create a Texture2D to act as the fill's gradient
+        // Create a Texture2D to represent the gradient
         Texture2D gradientTexture = new Texture2D(100, 1);
         gradientTexture.wrapMode = TextureWrapMode.Clamp;
 
         for (int x = 0; x < gradientTexture.width; x++)
         {
-            // Normalize x to a range of 0.0 to 1.0
+            // Normalize x (0.0 to 1.0)
             float normalizedX = x / (float)(gradientTexture.width - 1);
 
-            // Determine the color based on the slider value and current normalized position
+            // Apply exponential scaling to normalizedX
+            float exponentialX = Mathf.Pow(normalizedX, 2f); // Adjust the exponent for desired scaling
+
+            // Map exponentialX to a corresponding dB value
+            float currentDB = Mathf.Lerp(-70f, 0f, exponentialX);
+
+            // Assign color based on the dB ranges
             Color color;
-            if (value <= 0.5f)
+            if (currentDB <= -6f)
             {
-                // Entire slider is green
+                // Green block for dB <= -6
                 color = Color.green;
             }
-            else if (value > 0.5f && value <= 0.9f)
+            else if (currentDB > -6f && currentDB <= -0.5f && currentDB <= dBValue)
             {
-                // Green up to 50%, yellow up to the slider value
-                if (normalizedX <= 0.5f)
-                {
-                    color = Color.green;
-                }
-                else
-                {
-                    color = Color.yellow;
-                }
+                // Yellow block for -6 dB < currentDB <= -0.5 dB and within dBValue range
+                color = Color.yellow;
+            }
+            else if (currentDB > -0.5f && currentDB <= dBValue)
+            {
+                // Red block for -0.5 dB < currentDB <= dBValue
+                color = Color.red;
             }
             else
             {
-                // Green up to 50%, yellow up to 90%, red up to the slider value
-                if (normalizedX <= 0.5f)
-                {
-                    color = Color.green;
-                }
-                else if (normalizedX > 0.5f && normalizedX <= 0.9f)
-                {
-                    color = Color.yellow;
-                }
-                else
-                {
-                    color = Color.red;
-                }
+                // Transparent block for the rest (beyond the current value)
+                color = Color.clear; // This ensures the blocks stop at the current value
             }
+
+            // Debugging each pixel
+            Debug.Log($"Pixel {x}: currentDB = {currentDB}, color = {color}");
 
             // Set the color at the current pixel
             gradientTexture.SetPixel(x, 0, color);
         }
 
-        // Apply the changes to the texture
+        // Apply changes to the texture
         gradientTexture.Apply();
 
-        // Assign the texture as the fill sprite's material
+        // Assign the gradient texture to the slider's fill image
         fillImage.sprite = Sprite.Create(gradientTexture, new Rect(0, 0, gradientTexture.width, gradientTexture.height), new Vector2(0.5f, 0.5f));
     }
 }
-
 private void ReceivedInput(int index, OSCMessage message)
 {
     if (message.ToFloat(out var value))
@@ -157,10 +157,10 @@ private void ReceivedInput(int index, OSCMessage message)
         {
             // Convert linear value (e.g., 0.0 to 1.0) to decibel scale
             float dBValue = LinearToDecibel(value);
-
+      
             // Map the dB value to a slider range (e.g., -70 dB to 0 dB => 0.0 to 1.0)
             float normalizedValue = MapDecibelToSlider(dBValue, -70f, 0f);
-
+   
             // Update the slider value
             channelSliders[index].value = normalizedValue;
         }

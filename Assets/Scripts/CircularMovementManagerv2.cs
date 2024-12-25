@@ -482,7 +482,7 @@
 
                 int ObjectNumberSnapped = circularObjects.IndexOf(lastSelectedObject) + 1;
 
-                Debug.Log(ObjectNumberSnapped);
+                // Debug.Log(ObjectNumberSnapped);
                 var messagePan = new OSCMessage("/objectPosition");
                 messagePan.AddValue(OSCValue.Int(ObjectNumberSnapped));
                 messagePan.AddValue(OSCValue.Float(closestAngle)); // Send outPolar as an integer
@@ -491,7 +491,7 @@
 
                 Transmitter.Send(messagePan);
 
-                Debug.Log($"Object snapped to {closestAngle} degrees (adjusted for correct clockwise position)");
+                // Debug.Log($"Object snapped to {closestAngle} degrees (adjusted for correct clockwise position)");
             }
         }
     }

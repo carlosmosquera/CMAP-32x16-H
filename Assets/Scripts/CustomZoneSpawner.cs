@@ -268,6 +268,6 @@ public void SendDegreeAnglesViaOSC()
     // Send the message
     oscTransmitter.Send(message);
 
-    Debug.Log($"Degree angles sent via OSC to {addressToSend}.");
+    // Debug.Log($"Degree angles sent via OSC to {addressToSend}.");
 }
 }

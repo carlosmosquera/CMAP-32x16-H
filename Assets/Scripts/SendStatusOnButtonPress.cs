@@ -44,7 +44,7 @@ public class SendOSCOnButtonPress : MonoBehaviour
         var toggleMessage = new OSCMessage(toggleOSCAddress);
         toggleMessage.AddValue(OSCValue.Bool(isToggleOn));
         oscTransmitter.Send(toggleMessage);
-        Debug.Log($"Sent OSC Message: {toggleOSCAddress} {isToggleOn}");
+        // Debug.Log($"Sent OSC Message: {toggleOSCAddress} {isToggleOn}");
 
         // Send the number from the input field
         if (int.TryParse(numberInputField.text, out int number))
@@ -52,7 +52,7 @@ public class SendOSCOnButtonPress : MonoBehaviour
             var numberMessage = new OSCMessage(numberOSCAddress);
             numberMessage.AddValue(OSCValue.Int(number));
             oscTransmitter.Send(numberMessage);
-            Debug.Log($"Sent OSC Message: {numberOSCAddress} {number}");
+            // Debug.Log($"Sent OSC Message: {numberOSCAddress} {number}");
         }
         else
         {

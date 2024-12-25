@@ -90,43 +90,40 @@ private void UpdateSliderColor(int index, float value)
 {
     if (index >= 0 && index < sliderFillImages.Count)
     {
-        // Convert slider value (0.0 to 1.0) to dB value (-70 dB to 0 dB)
-        float dBValue = Mathf.Lerp(-70f, 0f, value);
+        // float dBValue = Mathf.Lerp(-70f, 0f, value);
 
-        Debug.Log($"UpdateSliderColor called for index: {index}, value: {value}, dBValue: {dBValue}");
+        if (index == 0)
+        {
+            // Convert the 0 to 1 value into -70 to 0 dB
+            Debug.Log($"UpdateSliderColor called for index: {index}, value: {value}");
+        }
 
         Image fillImage = sliderFillImages[index];
 
-        // Create a Texture2D to represent the gradient
+        // Create a Texture2D to act as the fill's gradient
         Texture2D gradientTexture = new Texture2D(100, 1);
         gradientTexture.wrapMode = TextureWrapMode.Clamp;
 
         for (int x = 0; x < gradientTexture.width; x++)
         {
-            // Normalize x (0.0 to 1.0)
+            // Normalize x to a range of 0.0 to 1.0
             float normalizedX = x / (float)(gradientTexture.width - 1);
 
-            // Apply exponential scaling to normalizedX
-            float exponentialX = Mathf.Pow(normalizedX, 2f); // Adjust the exponent for desired scaling
-
-            // Map exponentialX to a corresponding dB value
-            float currentDB = Mathf.Lerp(-70f, 0f, exponentialX);
-
-            // Assign color based on the dB ranges
+            // Determine the color based on the slider value and current normalized position
             Color color;
-            if (currentDB <= -6f)
+            if (normalizedX <= 0.7f)
             {
-                // Green block for dB <= -6
-                color = Color.green;
+                // Entire slider is green
+                color = Color.grey;
             }
-            else if (currentDB > -6f && currentDB <= -0.5f && currentDB <= dBValue)
+            else if (normalizedX > 0.7f && normalizedX <= 0.9f &&  normalizedX <= value)
             {
-                // Yellow block for -6 dB < currentDB <= -0.5 dB and within dBValue range
-                color = Color.yellow;
+           
+                    color = new Color(1f, 0.5f, 0f);
+                
             }
-            else if (currentDB > -0.5f && currentDB <= dBValue)
+            else if (normalizedX > 0.9f &&  normalizedX <= value)
             {
-                // Red block for -0.5 dB < currentDB <= dBValue
                 color = Color.red;
             }
             else
@@ -135,20 +132,18 @@ private void UpdateSliderColor(int index, float value)
                 color = Color.clear; // This ensures the blocks stop at the current value
             }
 
-            // Debugging each pixel
-            Debug.Log($"Pixel {x}: currentDB = {currentDB}, color = {color}");
-
             // Set the color at the current pixel
             gradientTexture.SetPixel(x, 0, color);
         }
 
-        // Apply changes to the texture
+        // Apply the changes to the texture
         gradientTexture.Apply();
 
-        // Assign the gradient texture to the slider's fill image
+        // Assign the texture as the fill sprite's material
         fillImage.sprite = Sprite.Create(gradientTexture, new Rect(0, 0, gradientTexture.width, gradientTexture.height), new Vector2(0.5f, 0.5f));
     }
 }
+
 private void ReceivedInput(int index, OSCMessage message)
 {
     if (message.ToFloat(out var value))

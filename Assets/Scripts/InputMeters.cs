@@ -92,19 +92,60 @@ private void UpdateSliderColor(int index, float value)
     {
         Image fillImage = sliderFillImages[index];
 
-        // Set the color based on value
-        if (value < 0.6f)
+        // Create a Texture2D to act as the fill's gradient
+        Texture2D gradientTexture = new Texture2D(100, 1);
+        gradientTexture.wrapMode = TextureWrapMode.Clamp;
+
+        for (int x = 0; x < gradientTexture.width; x++)
         {
-            fillImage.color = Color.green; // Green for normal levels
+            // Normalize x to a range of 0.0 to 1.0
+            float normalizedX = x / (float)(gradientTexture.width - 1);
+
+            // Determine the color based on the slider value and current normalized position
+            Color color;
+            if (value <= 0.5f)
+            {
+                // Entire slider is green
+                color = Color.green;
+            }
+            else if (value > 0.5f && value <= 0.9f)
+            {
+                // Green up to 50%, yellow up to the slider value
+                if (normalizedX <= 0.5f)
+                {
+                    color = Color.green;
+                }
+                else
+                {
+                    color = Color.yellow;
+                }
+            }
+            else
+            {
+                // Green up to 50%, yellow up to 90%, red up to the slider value
+                if (normalizedX <= 0.5f)
+                {
+                    color = Color.green;
+                }
+                else if (normalizedX > 0.5f && normalizedX <= 0.9f)
+                {
+                    color = Color.yellow;
+                }
+                else
+                {
+                    color = Color.red;
+                }
+            }
+
+            // Set the color at the current pixel
+            gradientTexture.SetPixel(x, 0, color);
         }
-        else if (value >= 0.6f && value < 1.0f)
-        {
-            fillImage.color = Color.yellow; // Yellow for cautionary levels
-        }
-        else if (value >= 1.0f)
-        {
-            fillImage.color = Color.red; // Red for peak levels
-        }
+
+        // Apply the changes to the texture
+        gradientTexture.Apply();
+
+        // Assign the texture as the fill sprite's material
+        fillImage.sprite = Sprite.Create(gradientTexture, new Rect(0, 0, gradientTexture.width, gradientTexture.height), new Vector2(0.5f, 0.5f));
     }
 }
 

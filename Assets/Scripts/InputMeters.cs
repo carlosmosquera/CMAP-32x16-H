@@ -105,36 +105,37 @@ private void UpdateSliderColor(int index, float value)
         gradientTexture.wrapMode = TextureWrapMode.Clamp;
 
         for (int x = 0; x < gradientTexture.width; x++)
-        {
-            // Normalize x to a range of 0.0 to 1.0
-            float normalizedX = x / (float)(gradientTexture.width - 1);
+{
+    // Normalize x to a range of 0.0 to 1.0
+    float normalizedX = x / (float)(gradientTexture.width - 1);
 
-            // Determine the color based on the slider value and current normalized position
-            Color color;
-            if (normalizedX <= 0.7f)
-            {
-                // Entire slider is green
-                color = Color.grey;
-            }
-            else if (normalizedX > 0.7f && normalizedX <= 0.9f &&  normalizedX <= value)
-            {
-           
-                    color = new Color(1f, 0.5f, 0f);
-                
-            }
-            else if (normalizedX > 0.9f &&  normalizedX <= value)
-            {
-                color = Color.red;
-            }
-            else
-            {
-                // Transparent block for the rest (beyond the current value)
-                color = Color.clear; // This ensures the blocks stop at the current value
-            }
+    // Determine the color based on the slider value and current normalized position
+    Color color;
 
-            // Set the color at the current pixel
-            gradientTexture.SetPixel(x, 0, color);
-        }
+    if (normalizedX <= 0.7f && normalizedX <= value)
+    {
+        // Entire slider is grey, but only up to the minimum of 0.7 and the current value
+        color = Color.grey;
+    }
+    else if (normalizedX > 0.7f && normalizedX <= 0.9f && normalizedX <= value)
+    {
+        // Orange block between 0.7 and 0.9
+        color = new Color(1f, 0.5f, 0f);
+    }
+    else if (normalizedX > 0.9f && normalizedX <= value)
+    {
+        // Red block beyond 0.9
+        color = Color.red;
+    }
+    else
+    {
+        // Transparent block for the rest (beyond the current value)
+        color = Color.clear; // This ensures the blocks stop at the current value
+    }
+
+    // Set the color at the current pixel
+    gradientTexture.SetPixel(x, 0, color);
+}
 
         // Apply the changes to the texture
         gradientTexture.Apply();

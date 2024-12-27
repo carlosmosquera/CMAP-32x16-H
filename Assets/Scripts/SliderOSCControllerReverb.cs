@@ -45,7 +45,7 @@ public class SliderOSCControllerReverb : MonoBehaviour
         int reverbDBInt = (int)reverbDB;
 
         var message = new OSCMessage(oscAddress);
-        message.AddValue(OSCValue.Float(reverbDBInt));
+        message.AddValue(OSCValue.Int(reverbDBInt));
         oscTransmitter.Send(message);
 
         // Debug.Log($"Sent OSC Message with Reverb dB: {reverbDBInt} dB");

@@ -7,7 +7,7 @@ public class CustomZoneSpawner : MonoBehaviour
 {
     public GameObject objectPrefab; // The prefab of the object to be spawned
     public int numberOfObjects = 5; // Number of objects to be spawned
-    private float radius = 3f; // Radius of the circle
+    private float radius = 2.8f; // Radius of the circle
 
     public List<float> degreeAngles = new List<float>(); // List of degree angles
     private List<GameObject> spawnedObjects = new List<GameObject>(); // List to store spawned objects
@@ -47,18 +47,11 @@ public void CreateAngleInputFields()
     }
     angleInputFields.Clear();
 
-    // Synchronize degreeAngles with numberOfObjects
-    while (degreeAngles.Count < numberOfObjects)
-    {
-        degreeAngles.Add(0); // Add default angles if fewer than numberOfObjects
-    }
-    while (degreeAngles.Count > numberOfObjects)
-    {
-        degreeAngles.RemoveAt(degreeAngles.Count - 1); // Remove extra angles
-    }
+    // Synchronize numberOfObjects with degreeAngles
+    numberOfObjects = degreeAngles.Count; // Ensure numberOfObjects matches the angles list
 
-    // Create new input fields based on updated degreeAngles
-    for (int i = 0; i < numberOfObjects; i++)
+    // Create new input fields based on degreeAngles
+    for (int i = 0; i < degreeAngles.Count; i++)
     {
         GameObject inputGO = Instantiate(angleInputPrefab, angleInputContainer);
         InputField angleField = inputGO.GetComponent<InputField>();
@@ -114,28 +107,25 @@ void UpdateAngleAtIndex(int index, string value)
 
 void UpdateDegreeAngles()
 {
-    // Synchronize degreeAngles with numberOfObjects
+    // Ensure degreeAngles matches numberOfObjects
     while (degreeAngles.Count < numberOfObjects)
     {
         degreeAngles.Add(0); // Add default angles
     }
-    while (degreeAngles.Count > numberOfObjects)
+
+    // Do not remove extra angles to allow proper handling
+    if (degreeAngles.Count > numberOfObjects)
     {
-        degreeAngles.RemoveAt(degreeAngles.Count - 1); // Remove extra angles
+        numberOfObjects = degreeAngles.Count; // Update numberOfObjects to match degreeAngles
     }
 
     // Update degree angles based on input fields
-    float angleStep = 360f / numberOfObjects;
-    for (int i = 0; i < numberOfObjects; i++)
+    for (int i = 0; i < degreeAngles.Count; i++)
     {
         if (i < angleInputFields.Count && int.TryParse(angleInputFields[i].text, out int angle))
         {
             angle = Mathf.Clamp(angle, -999, 999); // Restrict to valid angles
             degreeAngles[i] = angle; // Update degree angle list
-        }
-        else
-        {
-            degreeAngles[i] = Mathf.Clamp(Mathf.RoundToInt(i * angleStep), -999, 999); // Default evenly spaced angle
         }
     }
 }

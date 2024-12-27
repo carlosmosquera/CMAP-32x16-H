@@ -35,8 +35,16 @@ public class FileManager : MonoBehaviour
     private int delayTime; // To store the delay time value as an integer
     private int inputChannelNumber; // To store the InputChannelNumber value
 
+    public TMP_InputField sizeInput; // Input field for size
+    public TMP_InputField decayInput; // Input field for decay
+
+    private int sizeValue; // To store the size value
+    private float decayValue; // To store the decay value
+
     void Start()
     {
+   
+
         objTransforms = new Transform[transform.childCount];
         for (int i = 0; i < transform.childCount; i++)
         {
@@ -58,7 +66,8 @@ public class FileManager : MonoBehaviour
         fileDropdown.onValueChanged.AddListener(OnDropdownValueChanged);
 
         // Load the most recent file
-        string lastOpenedFile = PlayerPrefs.GetString("LastOpenedFile", null);
+
+             string lastOpenedFile = PlayerPrefs.GetString("LastOpenedFile", null);
         if (!string.IsNullOrEmpty(lastOpenedFile))
         {
             SelectFileFromDropdown(lastOpenedFile);
@@ -68,6 +77,7 @@ public class FileManager : MonoBehaviour
         {
             StartCoroutine(InvokeLoadButtonWithDelay());
         }
+
     }
 
     private void SelectFileFromDropdown(string fileName)
@@ -96,7 +106,7 @@ public class FileManager : MonoBehaviour
         fileNameInput.text = fileDropdown.options[index].text;
     }
 
-    void SaveData()
+        void SaveData()
     {
         string fileName = fileNameInput.text.Trim();
         if (string.IsNullOrEmpty(fileName))
@@ -153,23 +163,49 @@ public class FileManager : MonoBehaviour
             inputChannelNumber = 0; // Default value if parsing fails
         }
 
+        // Parse size value
+        if (sizeInput != null && int.TryParse(sizeInput.text, out int parsedSizeValue))
+        {
+            sizeValue = Mathf.Clamp(parsedSizeValue, 0, 100); // Ensure valid range
+        }
+        else
+        {
+            sizeValue = 0; // Default value if parsing fails
+        }
+
+        // Parse decay value
+        if (decayInput != null && float.TryParse(decayInput.text, out float parsedDecayValue))
+        {
+            decayValue = Mathf.Clamp(parsedDecayValue, 0.0f, 1.0f); // Ensure valid range
+        }
+        else
+        {
+            decayValue = 0.0f; // Default value if parsing fails
+        }
+
         SaveDataToFile(fileName, delayToggleState);
         PlayerPrefs.SetString("LastOpenedFile", fileName);
         PlayerPrefs.Save();
         Debug.Log($"Data saved to {fileName}");
         UpdateFileDropdown(fileName);
     }
-
 void LoadSelectedData()
 {
     int selectedIndex = fileDropdown.value;
     string fileName = fileDropdown.options[selectedIndex].text;
 
     LoadDataFromFile(fileName);
-    ApplyLoadedData();
-    SendPositionToAllObjects(); // Send OSC messages after loading data
 
-    // Trigger the applyButton automatically after loading data
+    if (customZoneSpawner != null)
+    {
+        customZoneSpawner.degreeAngles = new List<float>(savedAngles);
+        customZoneSpawner.numberOfObjects = customZoneSpawner.degreeAngles.Count; // Update numberOfObjects
+        customZoneSpawner.CreateAngleInputFields(); // Recreate input fields
+        customZoneSpawner.SpawnObjects(); // Refresh spawned objects
+    }
+
+    ApplyLoadedData();
+
     if (applyButton != null)
     {
         applyButton.onClick.Invoke();
@@ -292,10 +328,20 @@ void LoadSelectedData()
             inputChannelNumberInput.text = inputChannelNumber.ToString();
         }
 
+        if (sizeInput != null)
+        {
+            sizeInput.text = sizeValue.ToString();
+        }
+
+        if (decayInput != null)
+        {
+            decayInput.text = decayValue.ToString("F1");
+        }
+
         Debug.Log("Data loaded and applied.");
     }
 
-    void SaveDataToFile(string fileName, bool delayToggleState)
+void SaveDataToFile(string fileName, bool delayToggleState)
     {
         string filePath = Path.Combine(Application.persistentDataPath, $"{fileName}.json");
         Data data = new Data
@@ -307,14 +353,16 @@ void LoadSelectedData()
             headToggleState = HeadphonesToggleState,
             delayToggleState = delayToggleState,
             delayTime = delayTime,
-            inputChannelNumber = inputChannelNumber
+            inputChannelNumber = inputChannelNumber,
+            size = sizeValue, // Save size value
+            decay = decayValue // Save decay value
         };
         string jsonData = JsonUtility.ToJson(data);
         File.WriteAllText(filePath, jsonData);
         Debug.Log($"Data saved to {filePath}");
     }
 
-    void LoadDataFromFile(string fileName)
+  void LoadDataFromFile(string fileName)
     {
         string filePath = Path.Combine(Application.persistentDataPath, $"{fileName}.json");
         if (File.Exists(filePath))
@@ -328,15 +376,8 @@ void LoadSelectedData()
             customZoneInputValue = data.customZoneInputValue;
             HeadphonesToggleState = data.headToggleState;
             inputChannelNumber = data.inputChannelNumber;
-
-            if (customZoneSpawner != null)
-            {
-                customZoneSpawner.degreeAngles = new List<float>(savedAngles);
-                customZoneSpawner.numberOfObjects = savedAngles.Count;
-                customZoneSpawner.CreateAngleInputFields();
-                customZoneSpawner.UpdateAngleInputFields();
-                customZoneSpawner.SpawnObjects();
-            }
+            sizeValue = data.size; // Load size value
+            decayValue = data.decay; // Load decay value
 
             if (DelayToggle != null)
             {
@@ -348,8 +389,6 @@ void LoadSelectedData()
             {
                 delayTimeInput.text = delayTime.ToString();
             }
-
-            // Debug.Log($"Loaded InputChannelNumber: {inputChannelNumber}");
         }
         else
         {
@@ -402,6 +441,8 @@ private IEnumerator SendMessagesWithDelay()
         public bool delayToggleState;
         public int delayTime;
         public int inputChannelNumber;
+        public int size; // New size value
+        public float decay; // New decay value
     }
 }
 

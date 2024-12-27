@@ -13,7 +13,7 @@ public class SliderOSCControllerMono : MonoBehaviour
 
     public OSCTransmitter oscTransmitter;
 
-    private float currentReverbDB; // Stores the current reverb dB value
+    private float currentMonoDB; // Stores the current reverb dB value
 
     private void Start()
     {
@@ -31,13 +31,13 @@ public class SliderOSCControllerMono : MonoBehaviour
     private void UpdateReverbValue(float sliderValue)
     {
         // Map the slider value (0-1) to a dB range (-70 to 0) using a logarithmic scale
-        currentReverbDB = Mathf.Lerp(-70, 0, Mathf.Log10(1 + 9 * sliderValue) / Mathf.Log10(10));
+        currentMonoDB = Mathf.Lerp(-70, 0, Mathf.Log10(1 + 9 * sliderValue) / Mathf.Log10(10));
 
         // Display the dB value on the canvas
-        valueDisplay.text = $"{currentReverbDB:F0} dB";
+        valueDisplay.text = $"{currentMonoDB:F0} dB";
 
         // Send OSC message with the mapped dB value
-        SendOSCMessage(currentReverbDB);
+        SendOSCMessage(currentMonoDB);
     }
 
     private void SendOSCMessage(float reverbDB)
@@ -45,7 +45,7 @@ public class SliderOSCControllerMono : MonoBehaviour
         int reverbDBInt = (int)reverbDB;
 
         var message = new OSCMessage(oscAddress);
-        message.AddValue(OSCValue.Float(reverbDBInt));
+        message.AddValue(OSCValue.Int(reverbDBInt));
         oscTransmitter.Send(message);
 
         // Debug.Log($"Sent OSC Message with Reverb dB: {reverbDBInt} dB");
@@ -54,8 +54,8 @@ public class SliderOSCControllerMono : MonoBehaviour
     // Method to send the current reverb dB value when the button is pressed
     public void SendCurrentReverbDB()
     {
-        SendOSCMessage(currentReverbDB);
-        Debug.Log($"External trigger sent OSC Message with Reverb dB: {currentReverbDB:F0}");
+        SendOSCMessage(currentMonoDB);
+        // Debug.Log($"External trigger sent OSC Message with Reverb dB: {currentMonoDB:F0}");
     }
 
     private void OnDestroy()

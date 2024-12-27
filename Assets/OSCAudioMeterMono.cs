@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using extOSC;
 
-public class OSCAudioMeter : MonoBehaviour
+public class OSCAudioMeterMono : MonoBehaviour
 {
     [Header("OSC Settings")]
     public OSCReceiver oscReceiver;
@@ -33,6 +33,8 @@ public class OSCAudioMeter : MonoBehaviour
         oscReceiver.Bind(address, OnReceivePeakValue);
     }
 
+
+
     private void OnReceivePeakValue(OSCMessage message)
     {
         // Ensure the message contains a float value
@@ -48,6 +50,8 @@ public class OSCAudioMeter : MonoBehaviour
 
             // Update slider value on the UI
             audioMeterSlider.value = normalizedValue;
+
+
         }
         else
         {

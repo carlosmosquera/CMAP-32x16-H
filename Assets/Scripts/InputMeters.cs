@@ -95,7 +95,7 @@ private void UpdateSliderColor(int index, float value)
         if (index == 0)
         {
             // Convert the 0 to 1 value into -70 to 0 dB
-            Debug.Log($"UpdateSliderColor called for index: {index}, value: {value}");
+            // Debug.Log($"UpdateSliderColor called for index: {index}, value: {value}");
         }
 
         Image fillImage = sliderFillImages[index];

@@ -1,196 +1,184 @@
-    using System.Collections.Generic;
-    using UnityEngine;
-    using TMPro;
-    using extOSC;
-    using UnityEngine.UI; // For Button UI
-    using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using TMPro;
+using extOSC;
+using UnityEngine.UI;
+using System.Collections;
 
-    public class CircularMovementManagerv2 : MonoBehaviour
+public class CircularMovementManagerv2 : MonoBehaviour
+{
+    public OSCTransmitter Transmitter;
+    public OSCReceiver Receiver;
+    public Toggle cloneVisibilityToggle; // Reference to the Toggle in the UI for showing/hiding clones
+
+    public Toggle movementToggle; // Reference to the toggle in the UI
+    public CustomZoneSpawner zoneSpawner; // Reference to CustomZoneSpawner to access degreeAngles
+
+    [System.Serializable]
+    public class CircularObject
     {
-        public OSCTransmitter Transmitter;
+        public Transform objectTransform;
+        public SpriteRenderer spriteRenderer;
 
-        public OSCReceiver Receiver;
+        [HideInInspector]
+        public bool isDragging = false;
+        [HideInInspector]
+        public int angle = 0; // Store angle as an integer
+        [HideInInspector]
+        public float snappedAngle = float.NaN; // Store snapped angle
 
-        public Toggle movementToggle; // Reference to the toggle in the UI
+        [HideInInspector]
+        public Transform cloneTransform; // For clone in external area
+        [HideInInspector]
+        public SpriteRenderer cloneSpriteRenderer; // Renderer for clone
+    }
 
-        public CustomZoneSpawner zoneSpawner; // Reference to CustomZoneSpawner to access degreeAngles
+    public List<CircularObject> circularObjects = new List<CircularObject>();
+    private List<CircularObject> cloneObjects = new List<CircularObject>();
 
-        [System.Serializable]
-        public class CircularObject
+    public List<TMP_Text> sliderTexts = new List<TMP_Text>(); // Reference to the TMP_Text of each slider
+    public Button snapButton; // Reference to the Snap Button
+
+    public Transform slidersParent; // Reference to the parent of all sliders
+    private CircularObject lastSelectedObject = null; // Track the last selected object
+    private TMP_Text lastSelectedSliderText = null; // Track the last selected slider text
+
+    private float innerRadius = 2.8f;
+    private float outerRadius = 3.8f;
+
+    private IEnumerator DelayedSendPosition()
+    {
+        yield return new WaitForSeconds(0.5f); // Delay of 0.5 seconds
+
+        if (Transmitter == null)
         {
-            public Transform objectTransform;
-            public SpriteRenderer spriteRenderer;
-
-            [HideInInspector]
-            public bool isDragging = false;
-            [HideInInspector]
-            public int angle = 0;  // Store angle as an integer
-            [HideInInspector]
-            public float snappedAngle = float.NaN; // Store snapped angle
+            Debug.LogError("OSC Transmitter is not assigned in the Inspector!");
+            yield break;
         }
 
-        public List<CircularObject> circularObjects = new List<CircularObject>();
-        public List<TMP_Text> sliderTexts = new List<TMP_Text>(); // Reference to the TMP_Text of each slider
-
-        public Button snapButton; // Reference to the Snap Button
-
-        private CircularObject lastSelectedObject = null; // Track the last selected object
-        private TMP_Text lastSelectedSliderText = null; // Track the last selected slider text
-
-        public Transform slidersParent; // Reference to the parent of all sliders
-
-
-
-
-        private IEnumerator DelayedSendPosition()
+        if (circularObjects.Count == 0)
         {
-            yield return new WaitForSeconds(0.5f); // Delay of 0.1 seconds (adjust if necessary)
+            Debug.LogWarning("CircularObjects list is empty. Nothing to send.");
+        }
+        else
+        {
+            SendPosition(); // Call SendPosition after the delay
+        }
+    }
 
-            if (Transmitter == null)
-            {
-                Debug.LogError("OSC Transmitter is not assigned in the Inspector!");
-                yield break; // Stop the coroutine if Transmitter is missing
-            }
+    void Start()
+{
+    StartCoroutine(DelayedSendPosition());
 
-            if (circularObjects.Count == 0)
+    for (int i = 0; i < slidersParent.childCount; i++)
+    {
+        Transform sliderChild = slidersParent.GetChild(i);
+        Transform objNumberTransform = sliderChild.Find("Obj Number");
+        if (objNumberTransform != null)
+        {
+            TMP_Text textMeshPro = objNumberTransform.GetComponent<TMP_Text>();
+            if (textMeshPro != null)
             {
-                Debug.LogWarning("CircularObjects list is empty. Nothing to send.");
+                sliderTexts.Add(textMeshPro);
+                BoxCollider2D collider = objNumberTransform.GetComponent<BoxCollider2D>();
+                if (collider == null)
+                {
+                    collider = objNumberTransform.gameObject.AddComponent<BoxCollider2D>();
+                }
+                collider.isTrigger = true;
+                collider.offset = new Vector2(100, 0);
+                collider.size = new Vector2(450, 72);
             }
             else
             {
-                SendPosition(); // Call SendPosition after the delay
+                Debug.LogWarning($"TextMeshPro component not found in child 'Obj Number' of {sliderChild.name}");
+            }
+        }
+    }
+
+    for (int i = 0; i < circularObjects.Count; i++)
+    {
+        CircularObject obj = circularObjects[i];
+
+        // Create number object for the main circular object
+        GameObject numberObject = new GameObject("Number");
+        numberObject.transform.SetParent(obj.objectTransform);
+        numberObject.transform.localPosition = Vector3.zero;
+
+        TextMeshPro textMesh = numberObject.AddComponent<TextMeshPro>();
+        textMesh.text = (i + 1).ToString();
+        textMesh.fontSize = 3;
+        textMesh.color = Color.black;
+        textMesh.alignment = TextAlignmentOptions.Center;
+        textMesh.sortingOrder = 12;
+
+        numberObject.transform.localPosition = new Vector3(0, 0, -1);
+
+        if (obj.spriteRenderer == null)
+        {
+            obj.spriteRenderer = obj.objectTransform.GetComponent<SpriteRenderer>();
+            if (obj.spriteRenderer == null)
+            {
+                obj.spriteRenderer = obj.objectTransform.gameObject.AddComponent<SpriteRenderer>();
             }
         }
 
-        void Start()
+        obj.spriteRenderer.color = Color.grey; // Unselected
+        obj.spriteRenderer.sortingOrder = 8;
+
+        // Create clone for the external area
+        GameObject clone = new GameObject("Clone");
+        clone.transform.SetParent(transform);
+
+        // Position clone based on the outer radius
+        Vector3 direction = obj.objectTransform.position.normalized;
+        clone.transform.position = direction * outerRadius;
+
+        // Add sprite renderer to the clone and set properties
+        var cloneSpriteRenderer = clone.AddComponent<SpriteRenderer>();
+        cloneSpriteRenderer.sprite = obj.spriteRenderer.sprite;
+        cloneSpriteRenderer.color = new Color(0.5f, 0.8f, 1.0f, 0.8f); // Light blue semi-transparent
+        cloneSpriteRenderer.sortingOrder = obj.spriteRenderer.sortingOrder - 1;
+
+        // Scale the clone slightly smaller
+        clone.transform.localScale = obj.objectTransform.localScale * 0.8f;
+
+        obj.cloneTransform = clone.transform;
+
+        // Add number text to the clone
+        GameObject cloneNumberObject = new GameObject("CloneNumber");
+        cloneNumberObject.transform.SetParent(clone.transform);
+        cloneNumberObject.transform.localPosition = Vector3.zero;
+
+        TextMeshPro cloneTextMesh = cloneNumberObject.AddComponent<TextMeshPro>();
+        cloneTextMesh.text = (i + 1).ToString(); // Match the circular object's number
+        cloneTextMesh.fontSize = 2.5f;
+        cloneTextMesh.color = Color.black;
+        cloneTextMesh.alignment = TextAlignmentOptions.Center;
+        cloneTextMesh.sortingOrder = cloneSpriteRenderer.sortingOrder + 1;
+
+        cloneNumberObject.transform.localPosition = new Vector3(0, 0, -1);
+    }
+    cloneVisibilityToggle.onValueChanged.AddListener(OnCloneVisibilityToggleChanged);
+    snapButton.onClick.AddListener(SnapObjectsToClosestAngle);
+}
+
+    void OnCloneVisibilityToggleChanged(bool isVisible)
+    {
+        // Show or hide all clones based on the toggle state
+        foreach (var obj in circularObjects)
         {
-
-            StartCoroutine(DelayedSendPosition());
-
-
-            // Retrieve the TMP_Text components from each child of the parent folder
-            for (int i = 0; i < slidersParent.childCount; i++)
+            if (obj.cloneTransform != null)
             {
-                Transform sliderChild = slidersParent.GetChild(i);
-                //Debug.Log($"Child {i}: {sliderChild.name}");
-
-                Transform objNumberTransform = sliderChild.Find("Obj Number");
-                if (objNumberTransform != null)
-                {
-                    // Check for TextMeshPro or TextMeshProUGUI components
-                    TMP_Text textMeshPro = objNumberTransform.GetComponent<TMP_Text>();
-
-                    if (textMeshPro != null)
-                    {
-                        sliderTexts.Add(textMeshPro);
-                        //Debug.Log($"Slider Text Added: {textMeshPro.text}");
-
-                        // Add BoxCollider2D to Obj Number if it doesn't exist
-                        BoxCollider2D collider = objNumberTransform.GetComponent<BoxCollider2D>();
-                        if (collider == null)
-                        {
-                            collider = objNumberTransform.gameObject.AddComponent<BoxCollider2D>();
-                        }
-
-                        // Set collider properties
-                        collider.isTrigger = true;
-                        collider.offset = new Vector2(100, 0);
-                        collider.size = new Vector2(450, 72);
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"TextMeshPro component not found in child 'Obj Number' of {sliderChild.name}");
-                    }
-                }
-                else
-                {
-                    Debug.LogWarning($"Child named 'Obj Number' not found in {sliderChild.name}");
-                }
+                obj.cloneTransform.gameObject.SetActive(isVisible);
             }
-
-            //Debug.Log($"Total Slider Texts Found: {sliderTexts.Count}");
-
-            // Initialize the number for each object
-            for (int i = 0; i < circularObjects.Count; i++)
-            {
-                CircularObject obj = circularObjects[i];
-
-                // Create a new GameObject for the number
-                GameObject numberObject = new GameObject("Number");
-                numberObject.transform.SetParent(obj.objectTransform);
-                numberObject.transform.localPosition = Vector3.zero;
-
-                // Add and configure the TextMesh component
-                TextMeshPro textMesh = numberObject.AddComponent<TextMeshPro>();
-                textMesh.text = (i + 1).ToString();
-                textMesh.fontSize = 3;
-                textMesh.color = Color.black;
-                textMesh.alignment = TextAlignmentOptions.Center;
-                textMesh.sortingOrder = 12; // Ensure text is always on top
-
-                // Adjust the position if necessary
-                numberObject.transform.localPosition = new Vector3(0, 0, -1);
-
-                // Add a SpriteRenderer if not already set
-                if (obj.spriteRenderer == null)
-                {
-                    obj.spriteRenderer = obj.objectTransform.GetComponent<SpriteRenderer>();
-                    if (obj.spriteRenderer == null)
-                    {
-                        obj.spriteRenderer = obj.objectTransform.gameObject.AddComponent<SpriteRenderer>();
-                    }
-                }
-
-                // Set the initial appearance of the circular object
-                obj.spriteRenderer.color = Color.grey; // Unselected
-                obj.spriteRenderer.sortingOrder = 8;
-
-
-            }
-
-            snapButton.onClick.AddListener(SnapObjectsToClosestAngle); // Assign Snap Button click event
-
-
-
         }
+    }
 
-
-
-
-
-        void SendPosition()
-        {
-
-
-            foreach (var obj in circularObjects)
-            {
-
-
-            // Convert position to polar angle in degrees (clockwise), normalize to [0, 360) with 0 degrees at the top
-            float outPolarFloat = Mathf.Atan2(-obj.objectTransform.position.y, obj.objectTransform.position.x) * Mathf.Rad2Deg;
-            int outPolar = Mathf.RoundToInt((outPolarFloat + 90 + 360) % 360); // Add 90 degrees to offset the zero to the top
-
-            int ObjectNumber = circularObjects.IndexOf(obj) + 1;
-
-            // Create an OSC message with the address and polar angle
-            var messagePan = new OSCMessage("/objectPosition");
-            messagePan.AddValue(OSCValue.Int(ObjectNumber));
-            messagePan.AddValue(OSCValue.Int(outPolar)); // Send outPolar as an integer
-
-            //Debug.Log($"Object {ObjectNumber} position: {outPolar} degrees");
-
-            Transmitter.Send(messagePan);
-
-            }
-        }   
-
-
-
- void Update()
+    void Update()
 {
     if (Input.GetMouseButtonDown(0))
     {
-        // Get all hits under the mouse position
         RaycastHit2D[] hits = Physics2D.RaycastAll(Camera.main.ScreenToWorldPoint(Input.mousePosition), Vector2.zero);
 
         if (hits.Length > 0)
@@ -199,10 +187,8 @@
             CircularObject topmostObject = null;
             float highestSortingOrder = float.MinValue;
 
-            // Find the topmost object or TMP_Text that matches a hit
             foreach (var hit in hits)
             {
-                // Check if the hit is on a TMP_Text for the slider (Obj Number)
                 foreach (var text in sliderTexts)
                 {
                     if (hit.collider.transform == text.transform)
@@ -210,7 +196,6 @@
                         SelectSliderText(text);
                         isObjNumberSelected = true;
 
-                        // Select corresponding circular object without enabling dragging
                         int index = sliderTexts.IndexOf(text);
                         if (index != -1)
                         {
@@ -221,10 +206,8 @@
                     }
                 }
 
-                // Skip selecting a CircularObject if Obj Number was selected
                 if (isObjNumberSelected) break;
 
-                // Check if the hit is on a CircularObject
                 foreach (var obj in circularObjects)
                 {
                     if (hit.collider.transform == obj.objectTransform && obj.spriteRenderer.sortingOrder > highestSortingOrder)
@@ -235,7 +218,6 @@
                 }
             }
 
-            // Select the topmost object if found
             if (topmostObject != null)
             {
                 SelectObject(topmostObject);
@@ -250,14 +232,13 @@
             if (obj.isDragging)
             {
                 obj.isDragging = false;
-                // Keep the darker color for the currently selected object
                 if (obj == lastSelectedObject)
                 {
-                    obj.spriteRenderer.color = Color.blue; // highlighted
+                    obj.spriteRenderer.color = Color.blue;
                 }
                 else
                 {
-                    obj.spriteRenderer.color = new Color(0.2830189f, 0.1081346f, 0.1081346f); // Unselected
+                    obj.spriteRenderer.color = new Color(0.2830189f, 0.1081346f, 0.1081346f);
                 }
             }
         }
@@ -265,34 +246,34 @@
 
     foreach (var obj in circularObjects)
     {
+        if (obj.cloneTransform != null && cloneVisibilityToggle.isOn)
+            {
+                // Synchronize clone's azimuth with the main object
+                Vector3 azimuthDirection = obj.objectTransform.position.normalized;
+                obj.cloneTransform.position = azimuthDirection * Mathf.Clamp(obj.cloneTransform.position.magnitude, innerRadius, outerRadius);
+            }    
+        
+        // Handle main object dragging
         if (obj.isDragging)
         {
-            // Move object freely within the circle or constrain to the circle based on the toggle
             Vector2 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-
-            // Calculate the distance from the center (circle's origin is assumed to be at (0,0))
             float distanceFromCenter = mousePosition.magnitude;
 
-            // Limit the object's position based on the toggle state
-            float circleRadius = 3.0f; // Set the circle's radius
+            float circleRadius = 2.8f;
             if (movementToggle.isOn)
             {
-                // Free movement inside the circle
                 if (distanceFromCenter > circleRadius)
                 {
-                    mousePosition = mousePosition.normalized * circleRadius; // Clamp to perimeter if outside
+                    mousePosition = mousePosition.normalized * circleRadius;
                 }
             }
             else
             {
-                // Constrain movement to the circle's perimeter
                 mousePosition = mousePosition.normalized * circleRadius;
             }
 
-            // Update the object's position
             obj.objectTransform.position = mousePosition;
 
-            // Calculate elevation polar value (90° at center, 0° at edge) only if toggle is On
             int elevationPolar = 0;
             if (movementToggle.isOn)
             {
@@ -300,141 +281,159 @@
                 elevationPolar = Mathf.RoundToInt(elevation);
             }
 
-            // Convert position to polar angle in degrees (clockwise), normalize to [0, 360) with 0 degrees at the top
             float outPolarFloat = Mathf.Atan2(-obj.objectTransform.position.y, obj.objectTransform.position.x) * Mathf.Rad2Deg;
-            int outPolar = Mathf.RoundToInt((outPolarFloat + 90 + 360) % 360); // Add 90 degrees to offset the zero to the top
+            int outPolar = Mathf.RoundToInt((outPolarFloat + 90 + 360) % 360);
 
             int ObjectNumber = circularObjects.IndexOf(obj) + 1;
 
-            // Create an OSC message with the address and polar values
             var messagePan = new OSCMessage("/objectPosition");
             messagePan.AddValue(OSCValue.Int(ObjectNumber));
-            messagePan.AddValue(OSCValue.Int(outPolar));        // Send azimuth (angle around the circle)
+            messagePan.AddValue(OSCValue.Int(outPolar));
             if (movementToggle.isOn)
             {
-                messagePan.AddValue(OSCValue.Int(elevationPolar)); // Send elevation (distance-based) if toggle is On
+                messagePan.AddValue(OSCValue.Int(elevationPolar));
             }
 
-            //Debug.Log($"Object {ObjectNumber} azimuth: {outPolar}°, elevation: {elevationPolar}°");
+            Transmitter.Send(messagePan);
+        }
+
+        // Handle clone behavior
+// Handle clone behavior
+   if (obj.cloneTransform != null)
+    {
+        // Synchronize clone's azimuth with the main object
+        Vector3 azimuthDirection = obj.objectTransform.position.normalized;
+        obj.cloneTransform.position = azimuthDirection * Mathf.Clamp(obj.cloneTransform.position.magnitude, innerRadius, outerRadius);
+
+        // Allow dragging clones within the external area
+        if (Input.GetMouseButton(0))
+        {
+            Vector2 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+
+            // Check if mouse position is near the clone to allow dragging
+            if (Vector2.Distance(mousePosition, obj.cloneTransform.position) < 0.5f)
+            {
+                // Drag the clone
+                float distance = Mathf.Clamp(mousePosition.magnitude, innerRadius, outerRadius);
+                Vector3 newPosition = azimuthDirection * distance;
+
+                // Check if the position has changed
+                if (obj.cloneTransform.position != newPosition)
+                {
+                    obj.cloneTransform.position = newPosition;
+
+                    // Calculate normalized value (0.0 at innerRadius, 1.0 at outerRadius)
+                    float normalizedValue = Mathf.InverseLerp(innerRadius, outerRadius, distance);
+
+                    // Send OSC message
+                    int cloneNumber = circularObjects.IndexOf(obj) + 1;
+                    string oscAddress = $"/revsend/{cloneNumber}";
+
+                    var cloneMessage = new OSCMessage(oscAddress);
+                    cloneMessage.AddValue(OSCValue.Float(normalizedValue));
+
+                    Transmitter.Send(cloneMessage);
+                }
+            }
+        }
+        }   
+    }
+}
+
+    void SnapObjectsToClosestAngle()
+    {
+        if (lastSelectedObject != null)
+        {
+            float outPolarFloat = Mathf.Atan2(-lastSelectedObject.objectTransform.position.y, lastSelectedObject.objectTransform.position.x) * Mathf.Rad2Deg;
+            float currentAngle = (outPolarFloat + 90 + 360) % 360;
+
+            float closestAngle = float.NaN;
+            float minDifference = float.MaxValue;
+
+            foreach (float angle in zoneSpawner.degreeAngles)
+            {
+                float difference = Mathf.Abs(Mathf.DeltaAngle(currentAngle, angle));
+                if (difference < minDifference)
+                {
+                    minDifference = difference;
+                    closestAngle = angle;
+                }
+            }
+
+            lastSelectedObject.snappedAngle = closestAngle;
+
+            float radiansClosest = (closestAngle - 90) * Mathf.Deg2Rad;
+            float xClosest = Mathf.Cos(radiansClosest) * 2.8f;
+            float yClosest = -Mathf.Sin(radiansClosest) * 2.8f;
+
+            lastSelectedObject.objectTransform.position = new Vector2(xClosest, yClosest);
+
+            int ObjectNumberSnapped = circularObjects.IndexOf(lastSelectedObject) + 1;
+
+            var messagePan = new OSCMessage("/objectPosition");
+            messagePan.AddValue(OSCValue.Int(ObjectNumberSnapped));
+            messagePan.AddValue(OSCValue.Float(closestAngle));
 
             Transmitter.Send(messagePan);
         }
     }
-}
-
-
-        void HighlightObjectWithoutDragging(CircularObject obj)
-        {
-            if (lastSelectedObject != null && lastSelectedObject != obj)
-            {
-                // Revert the color and sorting order of the previously selected object
-                lastSelectedObject.spriteRenderer.color = Color.white; // Unselected
-                lastSelectedObject.spriteRenderer.sortingOrder = 8; // Reset sorting order to original value
-
-                // Change the color of the previously selected TextMeshPro back to white
-                Transform numberTransform = lastSelectedObject.objectTransform.Find("Number");
-                if (numberTransform != null)
-                {
-                    var textMeshPro = numberTransform.GetComponent<TextMeshPro>();
-                    if (textMeshPro != null)
-                    {
-                        textMeshPro.color = Color.black; // Deselect text
-                        textMeshPro.sortingOrder = 9; // Lower sorting order
-                    }
-                }
-            }
-
-            // Highlight the current selected object
-            obj.spriteRenderer.color = Color.blue;  // highlighted
-            obj.spriteRenderer.material.SetFloat("_Glossiness", 0.4f); // Optional: Add glossiness for effect
-            obj.spriteRenderer.sortingOrder = 11; // Set higher sorting order to bring it on top
-
-            // Change the color of the currently selected TextMeshPro to black
-            Transform currentNumberTransform = obj.objectTransform.Find("Number");
-            if (currentNumberTransform != null)
-            {
-                var currentTextMeshPro = currentNumberTransform.GetComponent<TextMeshPro>();
-                if (currentTextMeshPro != null)
-                {
-                    currentTextMeshPro.color = Color.white; // Select text
-                    currentTextMeshPro.sortingOrder = 12; // Higher sorting order to keep text on top
-                }
-            }
-
-            lastSelectedObject = obj; // Update the last selected object
-        }
-
 
     void SelectObject(CircularObject obj)
     {
         if (lastSelectedObject != null && lastSelectedObject != obj)
         {
-            // Revert the color and sorting order of the previously selected object
-            lastSelectedObject.spriteRenderer.color = Color.grey; // Unselected
-            lastSelectedObject.spriteRenderer.sortingOrder = 8; // Reset sorting order to original value
+            lastSelectedObject.spriteRenderer.color = Color.grey;
+            lastSelectedObject.spriteRenderer.sortingOrder = 8;
 
-            // Change the color of the previously selected TextMeshPro back to black
             Transform numberTransform = lastSelectedObject.objectTransform.Find("Number");
             if (numberTransform != null)
             {
                 var textMeshPro = numberTransform.GetComponent<TextMeshPro>();
                 if (textMeshPro != null)
                 {
-                    textMeshPro.color = Color.black; // Deselect text
-                    textMeshPro.sortingOrder = 9; // Lower sorting order
+                    textMeshPro.color = Color.black;
+                    textMeshPro.sortingOrder = 9;
                 }
             }
         }
 
-        // Highlight the current selected object
-        obj.spriteRenderer.color = Color.blue; // highlighted
-        obj.spriteRenderer.material.SetFloat("_Glossiness", 0.4f); // Optional: Add glossiness for effect
-        obj.spriteRenderer.sortingOrder = 11; // Set higher sorting order to bring it on top
+        obj.spriteRenderer.color = Color.blue;
+        obj.spriteRenderer.sortingOrder = 11;
 
-        // Change the color of the currently selected TextMeshPro to black
         Transform currentNumberTransform = obj.objectTransform.Find("Number");
         if (currentNumberTransform != null)
         {
             var currentTextMeshPro = currentNumberTransform.GetComponent<TextMeshPro>();
             if (currentTextMeshPro != null)
             {
-                currentTextMeshPro.color = Color.white; // Select text
-                currentTextMeshPro.sortingOrder = 12; // Higher sorting order to keep text on top
+                currentTextMeshPro.color = Color.white;
+                currentTextMeshPro.sortingOrder = 12;
             }
         }
 
-        // Select the corresponding slider text
         int objIndex = circularObjects.IndexOf(obj);
         if (objIndex != -1 && objIndex < sliderTexts.Count)
         {
             SelectSliderText(sliderTexts[objIndex]);
         }
 
-        lastSelectedObject = obj; // Update the last selected object
-        obj.isDragging = true; // Enable dragging for the selected object
+        lastSelectedObject = obj;
+        obj.isDragging = true;
     }
 
     void SelectSliderText(TMP_Text text)
     {
-        //Debug.Log("SelectSliderText called");
         int index = sliderTexts.IndexOf(text);
-        //Debug.Log($"Index of clicked text: {index}");
-
         if (index != -1)
         {
-            //Debug.Log("Valid index found, highlighting text");
-
-            // Highlight the text
             if (lastSelectedSliderText != null)
             {
-                lastSelectedSliderText.color = Color.white; // Revert previous slider text to black
+                lastSelectedSliderText.color = Color.white;
             }
 
             lastSelectedSliderText = sliderTexts[index];
-            lastSelectedSliderText.color = Color.blue; // Highlighted
-            //Debug.Log($"Highlighting slider text for object {index + 1}");
+            lastSelectedSliderText.color = Color.blue;
 
-            // Highlight the corresponding circular object
             if (index < circularObjects.Count)
             {
                 HighlightObjectWithoutDragging(circularObjects[index]);
@@ -446,52 +445,56 @@
         }
     }
 
-
-    void SnapObjectsToClosestAngle()
+    void HighlightObjectWithoutDragging(CircularObject obj)
+    {
+        if (lastSelectedObject != null && lastSelectedObject != obj)
         {
-            if (lastSelectedObject != null)
+            lastSelectedObject.spriteRenderer.color = Color.grey;
+            lastSelectedObject.spriteRenderer.sortingOrder = 8;
+
+            Transform numberTransform = lastSelectedObject.objectTransform.Find("Number");
+            if (numberTransform != null)
             {
-                // Calculate the current angle (clockwise orientation with offset)
-                float outPolarFloat = Mathf.Atan2(-lastSelectedObject.objectTransform.position.y, lastSelectedObject.objectTransform.position.x) * Mathf.Rad2Deg;
-                float currentAngle = (outPolarFloat + 90 + 360) % 360; // Add 90 degrees to offset zero to the top
-
-                //Debug.Log($"Current Angle: {currentAngle}");
-                float closestAngle = float.NaN;
-                float minDifference = float.MaxValue;
-
-                // Find the closest predefined angle
-                foreach (float angle in zoneSpawner.degreeAngles)
+                var textMeshPro = numberTransform.GetComponent<TextMeshPro>();
+                if (textMeshPro != null)
                 {
-                    float difference = Mathf.Abs(Mathf.DeltaAngle(currentAngle, angle));
-                    if (difference < minDifference)
-                    {
-                        minDifference = difference;
-                        closestAngle = angle;
-                    }
+                    textMeshPro.color = Color.black;
+                    textMeshPro.sortingOrder = 9;
                 }
-
-                // Snap the object to the closest angle
-                lastSelectedObject.snappedAngle = closestAngle;
-
-                // Adjust the snapped angle to place it correctly on the circle (clockwise, with 90-degree offset)
-                float radiansClosest = (closestAngle - 90) * Mathf.Deg2Rad; // Subtract 90 to place 0 degrees at the top
-                float xClosest = Mathf.Cos(radiansClosest) * 3.0f;
-                float yClosest = -Mathf.Sin(radiansClosest) * 3.0f; // Negate y to maintain clockwise orientation
-
-                lastSelectedObject.objectTransform.position = new Vector2(xClosest, yClosest);
-
-                int ObjectNumberSnapped = circularObjects.IndexOf(lastSelectedObject) + 1;
-
-                // Debug.Log(ObjectNumberSnapped);
-                var messagePan = new OSCMessage("/objectPosition");
-                messagePan.AddValue(OSCValue.Int(ObjectNumberSnapped));
-                messagePan.AddValue(OSCValue.Float(closestAngle)); // Send outPolar as an integer
-
-                //Debug.Log($"Object {ObjectNumber} position: {outPolar} degrees");
-
-                Transmitter.Send(messagePan);
-
-                // Debug.Log($"Object snapped to {closestAngle} degrees (adjusted for correct clockwise position)");
             }
         }
+
+        obj.spriteRenderer.color = Color.blue;
+        obj.spriteRenderer.sortingOrder = 11;
+
+        Transform currentNumberTransform = obj.objectTransform.Find("Number");
+        if (currentNumberTransform != null)
+        {
+            var currentTextMeshPro = currentNumberTransform.GetComponent<TextMeshPro>();
+            if (currentTextMeshPro != null)
+            {
+                currentTextMeshPro.color = Color.white;
+                currentTextMeshPro.sortingOrder = 12;
+            }
+        }
+
+        lastSelectedObject = obj;
     }
+
+    void SendPosition()
+    {
+        foreach (var obj in circularObjects)
+        {
+            float outPolarFloat = Mathf.Atan2(-obj.objectTransform.position.y, obj.objectTransform.position.x) * Mathf.Rad2Deg;
+            int outPolar = Mathf.RoundToInt((outPolarFloat + 90 + 360) % 360);
+
+            int ObjectNumber = circularObjects.IndexOf(obj) + 1;
+
+            var messagePan = new OSCMessage("/objectPosition");
+            messagePan.AddValue(OSCValue.Int(ObjectNumber));
+            messagePan.AddValue(OSCValue.Int(outPolar));
+
+            Transmitter.Send(messagePan);
+        }
+    }
+}

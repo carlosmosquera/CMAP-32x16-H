@@ -12,7 +12,7 @@ public class OSCAudioMeterMaster : MonoBehaviour
     public Slider audioMeterSlider;
 
     [Header("Decibel Meter Settings")]
-    private float minDecibels = -80f; // Minimum decibels
+    private float minDecibels = -70f; // Minimum decibels
     private float maxDecibels = 0f;  // Maximum decibels
 
     [Header("Color Modulation Settings")]

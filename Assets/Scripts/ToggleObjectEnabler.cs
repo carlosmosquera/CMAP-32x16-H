@@ -6,28 +6,39 @@ public class ToggleObjectEnabler : MonoBehaviour
     // Reference to the Toggle component
     public Toggle toggle;
 
-    // Reference to the GameObject to enable/disable
-    public GameObject targetObject;
+    // References to the GameObjects to enable/disable
+    public GameObject[] targetObjects;
 
     void Start()
     {
-        if (toggle == null || targetObject == null)
+        if (toggle == null || targetObjects == null || targetObjects.Length == 0)
         {
-            Debug.LogError("Toggle or TargetObject not assigned.");
+            Debug.LogError("Toggle or TargetObjects not assigned or empty.");
             return;
         }
 
         // Subscribe to the Toggle's onValueChanged event
         toggle.onValueChanged.AddListener(OnToggleValueChanged);
 
-        // Set the initial state based on the Toggle's value
-        targetObject.SetActive(toggle.isOn);
+        // Set the initial state for all target objects based on the Toggle's value
+        SetTargetObjectsActive(toggle.isOn);
     }
 
     void OnToggleValueChanged(bool isOn)
     {
-        // Enable or disable the target GameObject based on the Toggle's value
-        targetObject.SetActive(isOn);
+        // Enable or disable all target GameObjects based on the Toggle's value
+        SetTargetObjectsActive(isOn);
+    }
+
+    void SetTargetObjectsActive(bool isActive)
+    {
+        foreach (GameObject target in targetObjects)
+        {
+            if (target != null)
+            {
+                target.SetActive(isActive);
+            }
+        }
     }
 
     void OnDestroy()

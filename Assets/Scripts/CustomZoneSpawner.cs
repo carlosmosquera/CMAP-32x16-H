@@ -12,6 +12,9 @@ public class CustomZoneSpawner : MonoBehaviour
     public List<float> degreeAngles = new List<float>(); // List of degree angles
     private List<GameObject> spawnedObjects = new List<GameObject>(); // List to store spawned objects
 
+    public Transform objectContainer; // Container for spawned objects
+
+
     public InputField inputField; // InputField to set numberOfObjects
     public GameObject angleInputPrefab; // Prefab for individual angle input fields
     public Transform angleInputContainer; // Container for angle input fields
@@ -131,18 +134,26 @@ void UpdateDegreeAngles()
 }
 
 
-void SpawnObjectAtAngle(float angle)
-{
-    // Negate the angle to reverse direction and make positive clockwise
-    float radians = -angle * Mathf.Deg2Rad; // Convert degrees to radians (negative for clockwise)
-    float x = Mathf.Cos(radians) * radius; // Calculate x position
-    float y = Mathf.Sin(radians) * radius; // Calculate y position
 
-    Vector2 spawnPosition = new Vector2(x, y); // Set the spawn position
+    void SpawnObjectAtAngle(float angle)
+    {
+        // Negate the angle to reverse direction and make positive clockwise
+        float radians = -angle * Mathf.Deg2Rad; // Convert degrees to radians (negative for clockwise)
+        float x = Mathf.Cos(radians) * radius; // Calculate x position
+        float y = Mathf.Sin(radians) * radius; // Calculate y position
 
-    GameObject spawnedObject = Instantiate(objectPrefab, spawnPosition, Quaternion.identity); // Instantiate the object
-    spawnedObjects.Add(spawnedObject);
-}
+        Vector2 spawnPosition = new Vector2(x, y); // Set the spawn position
+
+        GameObject spawnedObject = Instantiate(objectPrefab, spawnPosition, Quaternion.identity); // Instantiate the object
+
+        // Set the parent to the object container if available
+        if (objectContainer != null)
+        {
+            spawnedObject.transform.SetParent(objectContainer);
+        }
+
+        spawnedObjects.Add(spawnedObject);
+    }
 
 public void SpawnObjects()
 {

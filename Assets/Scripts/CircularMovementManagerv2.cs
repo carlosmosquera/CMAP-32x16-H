@@ -46,6 +46,9 @@ public class CircularMovementManagerv2 : MonoBehaviour
     private float innerRadius = 2.8f;
     private float outerRadius = 3.8f;
 
+    public Transform cloneContainer;
+
+
     private IEnumerator DelayedSendPosition()
     {
         yield return new WaitForSeconds(0.5f); // Delay of 0.5 seconds
@@ -68,6 +71,12 @@ public class CircularMovementManagerv2 : MonoBehaviour
 
     void Start()
 {
+    if (cloneContainer == null)
+    {
+        Debug.LogError("Clone container is not assigned! Please assign it in the Inspector.");
+        return;
+    }
+
     StartCoroutine(DelayedSendPosition());
 
     for (int i = 0; i < slidersParent.childCount; i++)
@@ -128,7 +137,7 @@ public class CircularMovementManagerv2 : MonoBehaviour
 
         // Create clone for the external area
         GameObject clone = new GameObject("Clone");
-        clone.transform.SetParent(transform);
+        clone.transform.SetParent(cloneContainer); // Use the external container instead of 'transform'
 
         // Position clone based on the outer radius
         Vector3 direction = obj.objectTransform.position.normalized;

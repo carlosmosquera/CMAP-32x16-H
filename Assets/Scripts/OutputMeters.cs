@@ -17,22 +17,25 @@ public class OutputMeters : MonoBehaviour
     private List<Slider> channelSliders = new List<Slider>();
 
     // Start is called before the first frame update
-    void Start()
+void Start()
+{
+    sliderCountInput.onEndEdit.AddListener(CreateSliders);
+    if (extraSlidersToggle != null)
     {
-        sliderCountInput.onEndEdit.AddListener(CreateSliders);
-        if (extraSlidersToggle != null)
-        {
-            extraSlidersToggle.onValueChanged.AddListener(delegate { CreateSliders(sliderCountInput.text); });
-        }
-
-        for (int i = 1; i <= 18; i++)
-        {
-            int channelIndex = i; // Capture the current index for the closure
-            OSCReceiver.Bind($"{_channelLevelOutBase}{channelIndex}", message => ReceivedOutput(channelIndex, message));
-        }
+        extraSlidersToggle.onValueChanged.AddListener(delegate { CreateSliders(sliderCountInput.text); });
     }
 
+    for (int i = 1; i <= 18; i++)
+    {
+        int channelIndex = i; // Capture the current index for the closure
+        string channel = $"{_channelLevelOutBase}{channelIndex}";
+        OSCReceiver.Bind(channel, message => ReceivedOutput(channelIndex, message));
+        // Debug.Log($"Bound to OSC channel: {channel}"); // Add this line
+    }
+}
+
     // Create sliders dynamically based on user input
+// Updated CreateSliders method with binding for extra sliders
 private void CreateSliders(string input)
 {
     if (int.TryParse(input, out int sliderCount))
@@ -82,34 +85,52 @@ private void CreateSliders(string input)
             float extraStartPosition = sliderCount * spacing + extraSpacing;
 
             // Add two extra sliders
-            for (int i = 0; i < 2; i++)
+// Add two extra sliders
+for (int i = 0; i < 2; i++)
+{
+    GameObject extraSliderObj = Instantiate(sliderPrefab, sliderContainer);
+
+    // Ensure the slider object is active
+    extraSliderObj.SetActive(true);
+
+    // Position the extra slider
+    extraSliderObj.transform.localPosition = new Vector3(extraStartPosition + (i * spacing), 0, 0);
+
+    // Set the label text for extra sliders
+    Text labelText = extraSliderObj.GetComponentInChildren<Text>();
+    if (labelText != null)
+    {
+        labelText.text = $"{17 + i}"; // Correct channel labels for extra sliders
+    }
+
+    // Get the Slider component and add it to the list
+    Slider extraSlider = extraSliderObj.GetComponent<Slider>();
+    if (extraSlider != null)
+    {
+        // Ensure extra sliders correspond to channels 17 and 18
+        int channelIndex = 17 + i; // 17 for the first extra slider, 18 for the second
+        if (channelIndex - 1 >= channelSliders.Count)
+        {
+            // Add placeholders to match channel index
+            while (channelSliders.Count < channelIndex)
             {
-                GameObject extraSliderObj = Instantiate(sliderPrefab, sliderContainer);
-
-                // Ensure the slider object is active
-                extraSliderObj.SetActive(true);
-
-                // Position the extra slider
-                extraSliderObj.transform.localPosition = new Vector3(extraStartPosition + (i * spacing), 0, 0);
-
-                // Set the label text for extra sliders
-                Text labelText = extraSliderObj.GetComponentInChildren<Text>();
-                if (labelText != null)
-                {
-                    labelText.text = $"{sliderCount + i + 1}"; // Continue numbering from the main sliders
-                }
-
-                // Get the Slider component and add it to the list
-                Slider extraSlider = extraSliderObj.GetComponent<Slider>();
-                if (extraSlider != null)
-                {
-                    channelSliders.Add(extraSlider);
-                }
-                else
-                {
-                    Debug.LogError("The instantiated extra object does not have a Slider component.");
-                }
+                channelSliders.Add(null);
             }
+        }
+
+        // Replace placeholder with the actual slider
+        channelSliders[channelIndex - 1] = extraSlider;
+
+        // Bind the slider to the correct OSC channel
+        string extraChannel = $"{_channelLevelOutBase}{channelIndex}";
+        OSCReceiver.Bind(extraChannel, message => ReceivedOutput(channelIndex, message));
+        Debug.Log($"Extra slider bound to OSC channel: {extraChannel}");
+    }
+    else
+    {
+        Debug.LogError("The instantiated extra object does not have a Slider component.");
+    }
+}
         }
     }
     else
@@ -118,24 +139,42 @@ private void CreateSliders(string input)
     }
 }
 
-    // Generic Output Handler with decibel conversion
-    public void ReceivedOutput(int channelIndex, OSCMessage message)
+    // Generic Output Handler with decibel conversion// Generic Output Handler with decibel conversion
+public void ReceivedOutput(int channelIndex, OSCMessage message)
+{
+    // Debug.Log($"Received data for channel {channelIndex}: {message}"); // Debug log for received data
+
+    if (message.ToFloat(out var value))
     {
-        if (message.ToFloat(out var value))
+        if (channelIndex - 1 < channelSliders.Count && channelSliders[channelIndex - 1] != null)
         {
-            if (channelIndex - 1 < channelSliders.Count)
-            {
-                // Convert linear value to decibel scale
-                float dBValue = LinearToDecibel(value);
+            // Debug.Log($"Attempting to update slider for channel {channelIndex}");
 
-                // Map the dB value to a slider range (e.g., -70 dB to 0 dB => 0.0 to 1.0)
-                float normalizedValue = MapDecibelToSlider(dBValue, -70f, 0f);
+            // Update the corresponding slider
+            Slider targetSlider = channelSliders[channelIndex - 1];
 
-                // Update the slider value
-                channelSliders[channelIndex - 1].value = normalizedValue;
-            }
+            // Convert linear value to decibel scale
+            float dBValue = LinearToDecibel(value);
+
+            // Map the dB value to a slider range (e.g., -70 dB to 0 dB => 0.0 to 1.0)
+            float normalizedValue = MapDecibelToSlider(dBValue, -70f, 0f);
+
+            // Update the slider value
+            targetSlider.value = normalizedValue;
+
+            // Debug to confirm slider update
+            // Debug.Log($"Updated slider for channel {channelIndex}: Value: {value}, Normalized: {normalizedValue}, dB: {dBValue}");
+        }
+        else
+        {
+            // Debug.LogWarning($"Received data for channel {channelIndex}, but no corresponding slider exists in the list or it's null.");
         }
     }
+    else
+    {
+        Debug.LogError($"Failed to parse OSC message for channel {channelIndex}. Message data: {message}");
+    }
+}
 
     // Convert linear amplitude (0.0 to 1.0) to decibels (-∞ to 0 dB)
     private float LinearToDecibel(float linearValue)

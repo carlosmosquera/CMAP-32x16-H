@@ -5,7 +5,7 @@ public class BlinkingButtonController : MonoBehaviour
 {
     public Button blinkingButton; // Reference to the button
     public Toggle toggle1, toggle2; // References to the toggles
-    public InputField inputField1, inputField2; // References to the input fields
+    public InputField inputField1, inputField2, inputField3; // References to the input fields
 
     private bool shouldBlink = false;
     private float blinkInterval = 0.5f; // Blink interval in seconds
@@ -22,6 +22,8 @@ public class BlinkingButtonController : MonoBehaviour
         toggle2.onValueChanged.AddListener(OnTriggerChanged);
         inputField1.onValueChanged.AddListener(OnTriggerChanged);
         inputField2.onValueChanged.AddListener(OnTriggerChanged);
+        inputField3.onValueChanged.AddListener(OnTriggerChanged);
+
 
         // Set the initial color of the button
         blinkingButton.GetComponent<Image>().color = defaultColor;

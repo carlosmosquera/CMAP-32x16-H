@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using extOSC;
-using TMPro; // Add the extOSC namespace
+using TMPro;
 
 public class PlacementManager : MonoBehaviour
 {
@@ -13,6 +13,7 @@ public class PlacementManager : MonoBehaviour
     public Button sendButton;       // Reference to the external Button to send data
     public OSCTransmitter oscTransmitter; // Reference to the OSC Transmitter component
     public TMP_Text positionsText;      // Reference to the Text UI for displaying positions
+    public InputField maxClonesInputField; // Reference to the InputField for max clones
     public GameObject LoudspeakerContainer;    // External container to hold all prefabs
 
     private List<Vector2> placedPositions = new List<Vector2>(); // Store positions
@@ -38,15 +39,22 @@ public class PlacementManager : MonoBehaviour
         // Attach the SendPositions method to the Button's onClick event
         sendButton.onClick.AddListener(SendPositions);
 
+        // Attach an event listener to the input field for updating maxClones
+        if (maxClonesInputField != null)
+        {
+            maxClonesInputField.onValueChanged.AddListener(UpdateMaxClones);
+            maxClonesInputField.text = maxClones.ToString(); // Initialize input field with default value
+        }
+        else
+        {
+            Debug.LogError("Max Clones InputField is not assigned!");
+        }
+
         // Get the BoxCollider2D component attached to the area
         areaCollider = GetComponent<BoxCollider2D>();
         if (areaCollider == null)
         {
             Debug.LogError("BoxCollider2D is missing!");
-        }
-        else
-        {
-            Debug.Log("Collider bounds: " + areaCollider.bounds);
         }
 
         // Ensure the Toggles are assigned
@@ -128,30 +136,55 @@ public class PlacementManager : MonoBehaviour
         }
     }
 
-    void HandleDeleteMode()
+void HandleDeleteMode()
+{
+    if (Input.GetMouseButtonDown(0))
     {
-        if (Input.GetMouseButtonDown(0))
+        Vector3 worldPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        Vector2 clickPosition = new Vector2(worldPosition.x, worldPosition.y);
+
+        int cloneLayerMask = LayerMask.GetMask("Clone");
+        RaycastHit2D hit = Physics2D.Raycast(clickPosition, Vector2.zero, Mathf.Infinity, cloneLayerMask);
+
+        if (hit.collider != null)
         {
-            Vector3 worldPosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-            Vector2 clickPosition = new Vector2(worldPosition.x, worldPosition.y);
+            GameObject hitObject = hit.collider.gameObject;
 
-            int cloneLayerMask = LayerMask.GetMask("Clone");
-            RaycastHit2D hit = Physics2D.Raycast(clickPosition, Vector2.zero, Mathf.Infinity, cloneLayerMask);
+            // Find the position of the prefab being deleted
+            Vector2 objectPosition = new Vector2(hitObject.transform.position.x, hitObject.transform.position.y);
 
-            if (hit.collider != null)
+            // Use a threshold for comparing positions
+            const float positionThreshold = 0.01f;
+            Vector2 positionToRemove = Vector2.zero;
+            bool found = false;
+
+            foreach (Vector2 position in placedPositions)
             {
-                GameObject hitObject = hit.collider.gameObject;
-                Destroy(hitObject);
-                currentClones--;
-
-                Vector2 objectPosition = new Vector2(hitObject.transform.position.x, hitObject.transform.position.y);
-                placedPositions.Remove(objectPosition);
-
-                // Update UI
-                UpdatePositionsText();
+                if (Vector2.Distance(position, objectPosition) <= positionThreshold)
+                {
+                    positionToRemove = position;
+                    found = true;
+                    break;
+                }
             }
+
+            if (found)
+            {
+                // Remove the position from the list
+                placedPositions.Remove(positionToRemove);
+            }
+
+            // Destroy the prefab
+            Destroy(hitObject);
+
+            // Decrease the current clones count
+            currentClones--;
+
+            // Update the positionsText UI
+            UpdatePositionsText();
         }
     }
+}
 
     private bool IsWithinBounds(Vector2 position)
     {
@@ -203,5 +236,19 @@ public class PlacementManager : MonoBehaviour
     public List<Vector2> GetPlacedPositions()
     {
         return placedPositions;
+    }
+
+    // Update the maximum clones allowed from the input field
+    void UpdateMaxClones(string inputValue)
+    {
+        if (int.TryParse(inputValue, out int newMaxClones))
+        {
+            maxClones = Mathf.Max(0, newMaxClones); // Ensure it's non-negative
+            Debug.Log($"Max Clones updated to: {maxClones}");
+        }
+        else
+        {
+            Debug.LogError("Invalid input for Max Clones.");
+        }
     }
 }

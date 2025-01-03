@@ -111,10 +111,15 @@ void UpdateAngleAtIndex(int index, string value)
 void UpdateDegreeAngles()
 {
     // Ensure degreeAngles matches numberOfObjects
-    while (degreeAngles.Count < numberOfObjects)
-    {
-        degreeAngles.Add(0); // Add default angles
-    }
+  while (degreeAngles.Count < numberOfObjects)
+{
+    degreeAngles.Add(0); // Add missing angles
+}
+
+while (degreeAngles.Count > numberOfObjects)
+{
+    degreeAngles.RemoveAt(degreeAngles.Count - 1); // Trim excess angles
+}
 
     // Do not remove extra angles to allow proper handling
     if (degreeAngles.Count > numberOfObjects)
@@ -176,15 +181,14 @@ public void SpawnObjects()
 }
 
 
-
 public void UpdateNumberOfObjects(string input)
 {
     if (int.TryParse(input, out int newNumber))
     {
-        numberOfObjects = Mathf.Max(1, newNumber); // Ensure at least 1 object
-        CreateAngleInputFields(); // Recreate input fields to match new count
-        UpdateDegreeAngles(); // Recalculate angles
-        SpawnObjects(); // Refresh spawned objects
+        numberOfObjects = Mathf.Max(1, newNumber); // At least 1 object
+        UpdateDegreeAngles(); // Sync degree angles list
+        CreateAngleInputFields(); // Update UI
+        SpawnObjects(); // Reflect changes
     }
     else
     {
